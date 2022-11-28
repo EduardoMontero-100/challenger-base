@@ -27,7 +27,7 @@ class Challenger():
         pass
     
     
-    @staticmethod
+    
     def BorrarTablasTemporales(self, ):
 
         try:
@@ -36,40 +36,41 @@ class Challenger():
             pass
 
         try:
-            spark.sql(' drop table sdb_datamining.' + modelo + '_1' )
+            spark.sql(' drop table sdb_datamining.' + self.modelo + '_1' )
         except:
             pass
 
         try:
-            spark.sql(' drop table sdb_datamining.' + modelo + '_2' )
+            spark.sql(' drop table sdb_datamining.' + self.modelo + '_2' )
         except:
             pass
 
 
         try:
-            spark.sql(' drop table sdb_datamining.' + modelo + '_testing' )
+            spark.sql(' drop table sdb_datamining.' + self.modelo + '_testing' )
         except:
             pass
         
         
         
+
+    def BorrarResultadosDelModelo(self):    
         # Estas 2 son las que hay que grabar....
         
-        
         try:
-            spark.sql(' drop table sdb_datamining.' + modelo + '_metricas' )
+            spark.sql(' drop table sdb_datamining.' + self.modelo + '_metricas' )
         except:
             pass
         
         
         try:
-            spark.sql(' drop table sdb_datamining.' + modelo + '_feature_importance' )
+            spark.sql(' drop table sdb_datamining.' + self.modelo + '_feature_importance' )
         except:
             pass
         
         
         try:
-            spark.sql(' drop table sdb_datamining.' + modelo + '_feature_importance_rank' )
+            spark.sql(' drop table sdb_datamining.' + self.modelo + '_feature_importance_rank' )
         except:
             pass
 
@@ -964,11 +965,11 @@ def CalcularDeciles(pTrain, pTest):
 
 
 
-def CrearTablas():
-    
+def CrearTablas(self):
     ct = datetime.datetime.now()
     print("Crear Tablas:-", ct)
-    
+    self.BorrarTablasTemporales()
+
     ####################################################################
     # 1. Crear tabla para Training
     # 1.1. Leer ABT + TGT
@@ -1322,13 +1323,14 @@ def MejorModeloEntrenado():
     
     
     
-    def EjecutarChallenger():
+    def EjecutarChallenger(self):
     #if 1 > 0:
         import datetime;
         ct = datetime.datetime.now()
         print("Challenger Inicio:-", ct)
         
-        BorrarTablasTemporales()
+        
+        self.BorrarResultadosDelModelo()
         
         CrearTablas() 
         
