@@ -24,16 +24,46 @@ import datetime;
 import spark
 
 class Challenger():
-    def __init__(self,BALANCEAR_TARGET:bool, ELIMINAR_CORRELACIONES:bool, CASTEAR_BIGINT:bool, 
-                 REDONDEAR_DECIMALES:bool, CON_SCALER:bool, TIENE_TESTING:bool, CORRER_RF:bool, 
-                 CORRER_GB:bool, CORRER_LGBM:bool, CORRER_XGB:bool, CORRER_PRODUCTIVO:bool, 
-                 CAMPO_CLAVE:str,TARGET:str,modelo:str,PATH:str,ABT_VARIABLES:str,
-                 ABT_TABLA:str, TGT_TABLA:str, TGT_VARIABLES:str,
-                 TGT_BALENCEO:int, DECIMALES_VARIABLES_NUMERICAS:int, 
-                 COTA_CORRELACIONES:float, PARTICIONES:float, PORCENTAJE_TRAINING:float, 
-                 GB_param_test:dict, LGBM_param_test:dict, XGB_param_test:dict,
-                 RF_param_test:dict
+    def __init__(self,BALANCEAR_TARGET:bool, 
+                 ELIMINAR_CORRELACIONES:bool, 
+                 CASTEAR_BIGINT:bool, 
+                 REDONDEAR_DECIMALES:bool, 
+                 CON_SCALER:bool, 
+                 TIENE_TESTING:bool, 
+                 CORRER_RF:bool, 
+                 CORRER_GB:bool, 
+                 CORRER_LGBM:bool, 
+                 CORRER_XGB:bool, 
+                 CORRER_PRODUCTIVO:bool, 
+                 CAMPO_CLAVE:str,
+                 TARGET:str, 
+                 modelo:str,
+                 PATH:str,
+                 ABT_VARIABLES:str,
+                 ABT_TABLA:str, 
+                 TGT_TABLA:str, 
+                 TGT_VARIABLES:str,
+                 TGT_BALENCEO:int, 
+                 DECIMALES_VARIABLES_NUMERICAS:int, 
+                 COTA_CORRELACIONES:float, 
+                 PARTICIONES:float, 
+                 PORCENTAJE_TRAINING:float, 
+                 GB_param_test:dict, 
+                 LGBM_param_test:dict, 
+                 XGB_param_test:dict,
+                 RF_param_test:dict,
+                 PERIODO:str,
+                 PERIODO_TRAIN1:str,
+                 PERIODO_TRAIN2:str,
+                 PERIODO_TRAIN3:str,
+                 PERIODO_TRAIN4:str,
+                 PERIODO_TRAIN5:str,
+                 PERIODO_TRAIN6:str,
+                 PERIODO_TEST1:str,
+                 PERIODO_TEST2:str,
+                 PERIODO_TEST3:str,
                  ) -> None:
+        
         self.BALANCEAR_TARGET=BALANCEAR_TARGET
         self.ELIMINAR_CORRELACIONES=ELIMINAR_CORRELACIONES
         self.CASTEAR_BIGINT=CASTEAR_BIGINT
@@ -65,6 +95,18 @@ class Challenger():
         self.LGBM_param_test=LGBM_param_test
         self.XGB_param_test=XGB_param_test
    
+
+        self.PERIODO=PERIODO
+        self.PERIODO_TRAIN1=PERIODO_TRAIN1
+        self.PERIODO_TRAIN2=PERIODO_TRAIN2
+        self.PERIODO_TRAIN3=PERIODO_TRAIN3
+        self.PERIODO_TRAIN4=PERIODO_TRAIN4
+        self.PERIODO_TRAIN5=PERIODO_TRAIN5
+        self.PERIODO_TRAIN6=PERIODO_TRAIN6
+        self.PERIODO_TEST1=PERIODO_TEST1
+        self.PERIODO_TEST2=PERIODO_TEST2
+        self.PERIODO_TEST3=PERIODO_TEST3
+
 
     def BorrarTablasTemporales(self ):
 
