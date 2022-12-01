@@ -21,7 +21,6 @@ from sklearn import preprocessing
 from sklearn.metrics import roc_auc_score, accuracy_score
 import datetime;
 
-import spark
 
 class Challenger():
     def __init__(self,BALANCEAR_TARGET:bool, 
