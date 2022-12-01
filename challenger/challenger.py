@@ -61,7 +61,7 @@ class Challenger():
                  PERIODO_TEST1:str,
                  PERIODO_TEST2:str,
                  PERIODO_TEST3:str,
-                 ) -> None:
+                 spark) -> None:
         
         self.BALANCEAR_TARGET=BALANCEAR_TARGET
         self.ELIMINAR_CORRELACIONES=ELIMINAR_CORRELACIONES
@@ -105,28 +105,29 @@ class Challenger():
         self.PERIODO_TEST1=PERIODO_TEST1
         self.PERIODO_TEST2=PERIODO_TEST2
         self.PERIODO_TEST3=PERIODO_TEST3
+        self.spark=spark
 
 
     def BorrarTablasTemporales(self ):
 
         try:
-            spark.sql(' drop table sdb_datamining.' + self.modelo + '_0' )
+            self.spark.sql(' drop table sdb_datamining.' + self.modelo + '_0' )
         except:
             pass
 
         try:
-            spark.sql(' drop table sdb_datamining.' + self.modelo + '_1' )
+            self.spark.sql(' drop table sdb_datamining.' + self.modelo + '_1' )
         except:
             pass
 
         try:
-            spark.sql(' drop table sdb_datamining.' + self.modelo + '_2' )
+            self.spark.sql(' drop table sdb_datamining.' + self.modelo + '_2' )
         except:
             pass
 
 
         try:
-            spark.sql(' drop table sdb_datamining.' + self.modelo + '_testing' )
+            self.spark.sql(' drop table sdb_datamining.' + self.modelo + '_testing' )
         except:
             pass
         
@@ -137,19 +138,19 @@ class Challenger():
         # Estas 2 son las que hay que grabar....
         
         try:
-            spark.sql(' drop table sdb_datamining.' + self.modelo + '_metricas' )
+            self.spark.sql(' drop table sdb_datamining.' + self.modelo + '_metricas' )
         except:
             pass
         
         
         try:
-            spark.sql(' drop table sdb_datamining.' + self.modelo + '_feature_importance' )
+            self.spark.sql(' drop table sdb_datamining.' + self.modelo + '_feature_importance' )
         except:
             pass
         
         
         try:
-            spark.sql(' drop table sdb_datamining.' + self.modelo + '_feature_importance_rank' )
+            self.spark.sql(' drop table sdb_datamining.' + self.modelo + '_feature_importance_rank' )
         except:
             pass
 
@@ -269,9 +270,9 @@ class Challenger():
 
 
 
-    def ControlParticiones(self, train_undersampled_df, Cantidad_de_Particiones):
+    def ControlParticiones(train_undersampled_df, pCampoClave, Num_reg_particion):
         # Control de Particiones.....
-        
+        import pyspark.sql.functions as F
         
         print("Number of partitions PARTY: {}".format(train_undersampled_df.rdd.getNumPartitions()))
         
@@ -281,10 +282,28 @@ class Challenger():
         # Mas de 100k y menos de 300k cada particion
         
         # Ni muy chica, ni muy grande cada particion
-        train_undersampled_df = train_undersampled_df.repartition(Cantidad_de_Particiones, self.CAMPO_CLAVE)
+        
+        Cantidad_de_Particiones_0 = int(train_undersampled_df.count() / Num_reg_particion)
+
+
+
+        if ((Cantidad_de_Particiones_0 % 4) >=2):
+            Cantidad_de_Particiones = int(Cantidad_de_Particiones_0/4)*4+4
+        elif(Cantidad_de_Particiones_0 == 0):
+            Cantidad_de_Particiones = 1
+        else:
+            Cantidad_de_Particiones = int(Cantidad_de_Particiones_0/4)*4
+
+
+
+        print(Cantidad_de_Particiones)
+
+
+
+        train_undersampled_df = train_undersampled_df.repartition(Cantidad_de_Particiones, pCampoClave)
         train_undersampled_df.groupBy(F.spark_partition_id()).count().show()
         
-        return train_undersampled_df
+        return train_undersampled_df    
     
 
 
@@ -448,7 +467,7 @@ class Challenger():
         BINARIO = f"{self.self.PERIODO}_challenger_{SMALL_ALGO}"
         
         
-        model_cvresults = spark.createDataFrame(
+        model_cvresults = self.spark.createDataFrame(
             feat_imp, 
             [ "variable", "importance"]  
         )
@@ -459,7 +478,7 @@ class Challenger():
         
 
         try:
-            a = spark.sql("select count(1) from sdb_datamining." + self.modelo + '_feature_importance')
+            a = self.spark.sql("select count(1) from sdb_datamining." + self.modelo + '_feature_importance')
             model_cvresults.write.mode('append').format('parquet').saveAsTable('sdb_datamining.' + self.modelo + '_feature_importance')
         except:
             model_cvresults.write.mode('overwrite').format('parquet').saveAsTable('sdb_datamining.' + self.modelo + '_feature_importance')
@@ -491,7 +510,7 @@ class Challenger():
         df_values_lst.append((self.PERIODO, Nombre_Modelo  , "hyperparametros", str(hyperparametros)))
         df_values_lst.append((self.PERIODO, Nombre_Modelo , "AUC_VALIDACION", str(auc_cv)))
 
-        model_cvresults = spark.createDataFrame(
+        model_cvresults = self.spark.createDataFrame(
             df_values_lst, 
             ["periodo", "algorithm", "metric_desc", "metric_value"]  
         )
@@ -509,7 +528,7 @@ class Challenger():
         # Cambiar esto con la tabla original
         
         try:
-            a = spark.sql("select count(1) from sdb_datamining." + self.modelo + '_metricas')
+            a = self.spark.sql("select count(1) from sdb_datamining." + self.modelo + '_metricas')
             model_cvresults.write.mode('append').format('parquet').saveAsTable('sdb_datamining.' + self.modelo + '_metricas')
         except:
             model_cvresults.write.mode('overwrite').format('parquet').saveAsTable('sdb_datamining.' + self.modelo + '_metricas')
@@ -526,7 +545,7 @@ class Challenger():
             cvModel3.write().overwrite().save(self.PATH + '/' + BINARIO + ".bin")
             
         try:
-            CalcularDeciles(trainingDataScore.select(self.CAMPO_CLAVE, 'label', 'Prob1').toPandas(), testDataScore.select(self.CAMPO_CLAVE, 'label', 'Prob1').toPandas())
+            self.CalcularDeciles(trainingDataScore.select(self.CAMPO_CLAVE, 'label', 'Prob1').toPandas(), testDataScore.select(self.CAMPO_CLAVE, 'label', 'Prob1').toPandas())
         except:
             print('Error Calcular Deciles')
         return cvModel3
@@ -551,7 +570,7 @@ class Challenger():
         df_values_lst = []
         df_values_lst.append((self.PERIODO, Nombre_Modelo , "AUC_TESTEO", str(auc_cv)))
         
-        model_cvresults = spark.createDataFrame(df_values_lst, ["periodo", "algorithm", "metric_desc", "metric_value"]  )
+        model_cvresults = self.spark.createDataFrame(df_values_lst, ["periodo", "algorithm", "metric_desc", "metric_value"]  )
         SMALL_ALGO = Nombre_Modelo.lower()
         BINARIO = f"{self.PERIODO}_challenger_{SMALL_ALGO}"
         model_cvresults = model_cvresults.withColumn("bin", F.lit(BINARIO))
@@ -599,7 +618,7 @@ class Challenger():
         
         # Get column names first
         
-        names_df = spark.sql("select * from sdb_datamining." + self.modelo + "_variables where variable not in ( 'label' , '" + self.CAMPO_CLAVE + "') order by variable  ")
+        names_df = self.spark.sql("select * from sdb_datamining." + self.modelo + "_variables where variable not in ( 'label' , '" + self.CAMPO_CLAVE + "') order by variable  ")
         numericCols = names_df.select('variable').rdd.flatMap(lambda x: x).collect()
         
         
@@ -794,7 +813,7 @@ class Challenger():
         BINARIO = f"{self.PERIODO}_challenger_{SMALL_ALGO}"
         
         
-        model_cvresults = spark.createDataFrame(
+        model_cvresults = self.spark.createDataFrame(
             feat_imp, 
             [ "variable", "importance"]  
         )
@@ -807,7 +826,7 @@ class Challenger():
         
 
         try:
-            a = spark.sql("select count(1) from sdb_datamining." + self.modelo + '_feature_importance')
+            a = self.spark.sql("select count(1) from sdb_datamining." + self.modelo + '_feature_importance')
             model_cvresults.write.mode('append').format('parquet').saveAsTable('sdb_datamining.' + self.modelo + '_feature_importance')
         except:
             model_cvresults.write.mode('overwrite').format('parquet').saveAsTable('sdb_datamining.' + self.modelo + '_feature_importance')
@@ -862,7 +881,7 @@ class Challenger():
         df_values_lst.append((self.PERIODO, Nombre_Modelo  , "hyperparametros", str(hyperparametros)))
         df_values_lst.append((self.PERIODO, Nombre_Modelo , "AUC_VALIDACION", str(auc_cv)))
 
-        model_cvresults = spark.createDataFrame(
+        model_cvresults = self.spark.createDataFrame(
             df_values_lst, 
             ["periodo", "algorithm", "metric_desc", "metric_value"]  
         )
@@ -880,7 +899,7 @@ class Challenger():
         # Cambiar esto con la tabla original
         
         try:
-            a = spark.sql("select count(1) from sdb_datamining." + self.modelo + '_metricas')
+            a = self.spark.sql("select count(1) from sdb_datamining." + self.modelo + '_metricas')
             model_cvresults.write.mode('append').format('parquet').saveAsTable('sdb_datamining.' + self.modelo + '_metricas')
         except:
             model_cvresults.write.mode('overwrite').format('parquet').saveAsTable('sdb_datamining.' + self.modelo + '_metricas')
@@ -903,7 +922,7 @@ class Challenger():
 
         try:
             
-            CalcularDeciles(trainDataScore[[self.CAMPO_CLAVE, 'label', 'Prob1']], testDataScore[[self.CAMPO_CLAVE, 'label', 'Prob1']])
+            self.CalcularDeciles(trainDataScore[[self.CAMPO_CLAVE, 'label', 'Prob1']], testDataScore[[self.CAMPO_CLAVE, 'label', 'Prob1']])
         except:
             print('Error Calcular Deciles')
         return scaler, clf_final_train
@@ -920,7 +939,7 @@ class Challenger():
 
         # Leo las variables de entrada al self.modelo
         
-        names_df = spark.sql("select * from sdb_datamining." + self.modelo + "_variables where  variable not in ( 'label' , '" + self.CAMPO_CLAVE + "')  order by variable  ")
+        names_df = self.spark.sql("select * from sdb_datamining." + self.modelo + "_variables where  variable not in ( 'label' , '" + self.CAMPO_CLAVE + "')  order by variable  ")
         names = names_df.select('variable').rdd.flatMap(lambda x: x).collect()
         
         
@@ -979,7 +998,7 @@ class Challenger():
         df_values_lst = []
         df_values_lst.append((self.PERIODO, Nombre_Modelo  , "AUC_TESTEO", str(auc_cv)))
         
-        model_cvresults = spark.createDataFrame(df_values_lst, ["periodo", "algorithm", "metric_desc", "metric_value"]  )
+        model_cvresults = self.spark.createDataFrame(df_values_lst, ["periodo", "algorithm", "metric_desc", "metric_value"]  )
 
         SMALL_ALGO = Nombre_Modelo.lower()
         BINARIO = f"{self.PERIODO}_challenger_{SMALL_ALGO}"
@@ -1062,7 +1081,7 @@ class Challenger():
                     WHERE   a.periodo IN (""" + str(self.PERIODO_TRAIN1) + " , " +  str(self.PERIODO_TRAIN2)  + " , " +str( self.PERIODO_TRAIN3)  + " , " + str(self.PERIODO_TRAIN4)  + " , " + str(self.PERIODO_TRAIN5)  + " , " + str(self.PERIODO_TRAIN6) + ")"
         
         # cargamos las variables de la abt que se uso en el modelo productivo y el target con los periodos de training para realizar el entrenamiento 
-        train_undersampled_df = spark.sql(pABT).na.fill(-999)
+        train_undersampled_df = self.spark.sql(pABT).na.fill(-999)
         
         train_undersampled_df.write.mode('overwrite').format('parquet').saveAsTable('sdb_datamining.' + self.modelo + '_0')
         
@@ -1070,7 +1089,7 @@ class Challenger():
         # 1.2. Balanceo y Particiones
         ####################################################################
         
-        train_undersampled_df = spark.sql("select * from sdb_datamining." +  self.modelo + '_0')
+        train_undersampled_df = self.spark.sql("select * from sdb_datamining." +  self.modelo + '_0')
         print('TABLA ORIGINAL: ', train_undersampled_df.count())
         
         if self.BALANCEAR_TARGET  == True:
@@ -1084,7 +1103,7 @@ class Challenger():
         # 1.3. Corregir Numeros, Eliminar Correlaciones y Particiones
         ####################################################################
         
-        train_undersampled_df = spark.sql("select * from sdb_datamining." +  self.modelo + '_1')
+        train_undersampled_df = self.spark.sql("select * from sdb_datamining." +  self.modelo + '_1')
         
         if self.CASTEAR_BIGINT == True:
             train_undersampled_df = self.CastBigInt(train_undersampled_df)
@@ -1109,7 +1128,7 @@ class Challenger():
         variable = pd.DataFrame(train_undersampled_df.columns)
         variable.columns = ['variable']
         
-        variable = spark.createDataFrame(
+        variable = self.spark.createDataFrame(
                 variable, 
                 ["variable"]  
             )
@@ -1128,8 +1147,8 @@ class Challenger():
                                                                 AND a.periodo = b.periodo 
                         WHERE   a.periodo IN (""" + str(self.PERIODO_TEST1) + " , " +  str(self.PERIODO_TEST2)  + " , " +str( self.PERIODO_TEST3) + ")"
             
-            test_undersampled_df = spark.sql(pABT)
-            test_undersampled_df = spark.sql(pABT).na.fill(-999)
+            test_undersampled_df = self.spark.sql(pABT)
+            test_undersampled_df = self.spark.sql(pABT).na.fill(-999)
             
             print('TABLA PREDICCIONES: ', test_undersampled_df.count())
             
@@ -1152,12 +1171,12 @@ class Challenger():
 
         print("Entrenamiento:-", ct)
         
-        train_undersampled_df = spark.sql("select * from sdb_datamining." +  self.modelo  + '_2')
+        train_undersampled_df = self.spark.sql("select * from sdb_datamining." +  self.modelo  + '_2')
         
         if self.TIENE_TESTING == True:
-            testing_df_m1 = spark.sql("select * from sdb_datamining." +  self.modelo + '_testing where periodo = ' + str(self.PERIODO_TEST1) )
-            testing_df_m2 = spark.sql("select * from sdb_datamining." +  self.modelo + '_testing where periodo = ' + str(self.PERIODO_TEST2) )
-            testing_df_m3 = spark.sql("select * from sdb_datamining." +  self.modelo + '_testing where periodo = ' + str(self.PERIODO_TEST3) )
+            testing_df_m1 = self.spark.sql("select * from sdb_datamining." +  self.modelo + '_testing where periodo = ' + str(self.PERIODO_TEST1) )
+            testing_df_m2 = self.spark.sql("select * from sdb_datamining." +  self.modelo + '_testing where periodo = ' + str(self.PERIODO_TEST2) )
+            testing_df_m3 = self.spark.sql("select * from sdb_datamining." +  self.modelo + '_testing where periodo = ' + str(self.PERIODO_TEST3) )
 
 
         #############################################################################    
@@ -1208,13 +1227,13 @@ class Challenger():
                 print (' LIGHTGBM ')
                 
                 Nombre_Modelo = 'LGBM_' + str(Corrida)
-                LGBM_scaler_train, LGBM_model_train = EntrenarModeloPandas('LGBM', train_undersampled_df, self.PORCENTAJE_TRAINING, self.LGBM_param_test, Nombre_Modelo)
+                LGBM_scaler_train, LGBM_model_train = self.EntrenarModeloPandas('LGBM', train_undersampled_df, self.PORCENTAJE_TRAINING, self.LGBM_param_test, Nombre_Modelo)
                 
                 if self.TIENE_TESTING == True:        
                     print( 'Testing ')
-                    TestingModeloPython('LGBM', testing_df_m1, LGBM_scaler_train, LGBM_model_train, Nombre_Modelo + ' TESTING MES1')
-                    TestingModeloPython('LGBM', testing_df_m2, LGBM_scaler_train, LGBM_model_train, Nombre_Modelo + ' TESTING MES2')
-                    TestingModeloPython('LGBM', testing_df_m3, LGBM_scaler_train, LGBM_model_train, Nombre_Modelo + ' TESTING MES3')
+                    self.TestingModeloPython('LGBM', testing_df_m1, LGBM_scaler_train, LGBM_model_train, Nombre_Modelo + ' TESTING MES1')
+                    self.TestingModeloPython('LGBM', testing_df_m2, LGBM_scaler_train, LGBM_model_train, Nombre_Modelo + ' TESTING MES2')
+                    self.TestingModeloPython('LGBM', testing_df_m3, LGBM_scaler_train, LGBM_model_train, Nombre_Modelo + ' TESTING MES3')
         except:
             print('Error Lightgbm')
         
@@ -1226,13 +1245,13 @@ class Challenger():
                 print (' XGB ')
                 
                 Nombre_Modelo = 'XGB_' + str(Corrida)
-                XGB_scaler_train, XGB_model_train = EntrenarModeloPandas('XGB', train_undersampled_df, self.PORCENTAJE_TRAINING, self.XGB_param_test, Nombre_Modelo)
+                XGB_scaler_train, XGB_model_train = self.EntrenarModeloPandas('XGB', train_undersampled_df, self.PORCENTAJE_TRAINING, self.XGB_param_test, Nombre_Modelo)
                 
                 if self.TIENE_TESTING == True:        
                     print( 'Testing ')
-                    TestingModeloPython('XGB', testing_df_m1, XGB_scaler_train, XGB_model_train, Nombre_Modelo + ' TESTING MES1')
-                    TestingModeloPython('XGB', testing_df_m2, XGB_scaler_train, XGB_model_train, Nombre_Modelo + ' TESTING MES2')
-                    TestingModeloPython('XGB', testing_df_m3, XGB_scaler_train, XGB_model_train, Nombre_Modelo + ' TESTING MES3')
+                    self.TestingModeloPython('XGB', testing_df_m1, XGB_scaler_train, XGB_model_train, Nombre_Modelo + ' TESTING MES1')
+                    self.TestingModeloPython('XGB', testing_df_m2, XGB_scaler_train, XGB_model_train, Nombre_Modelo + ' TESTING MES2')
+                    self.TestingModeloPython('XGB', testing_df_m3, XGB_scaler_train, XGB_model_train, Nombre_Modelo + ' TESTING MES3')
             
         except:
             print('Error XGBoost')
@@ -1258,14 +1277,14 @@ class Challenger():
                 elif self.MODELO_PRODUCTIVO == 'LGBM':
                         
                     Nombre_Modelo = 'LGBM_PRODUCTIVO' + str(Corrida)           
-                    Productivo_scaler_train, Productivo__model_train = EntrenarModeloPandas('LGBM', train_undersampled_df, self.PORCENTAJE_TRAINING, self.MODELO_PRODUCTIVO_param_test, Nombre_Modelo)
+                    Productivo_scaler_train, Productivo__model_train = self.EntrenarModeloPandas('LGBM', train_undersampled_df, self.PORCENTAJE_TRAINING, self.MODELO_PRODUCTIVO_param_test, Nombre_Modelo)
                     
                 elif self.MODELO_PRODUCTIVO == 'XGB':
                         
                     Nombre_Modelo = 'XGB_PRODUCTIVO' + str(Corrida)           
-                    Productivo_scaler_train, Productivo__model_train, XGB_trainingData_Score, XGB_testingData_Score = EntrenarModeloPandas('XGB', train_undersampled_df, self.PORCENTAJE_TRAINING, self.MODELO_PRODUCTIVO_param_test, Nombre_Modelo)
+                    Productivo_scaler_train, Productivo__model_train, XGB_trainingData_Score, XGB_testingData_Score = self.EntrenarModeloPandas('XGB', train_undersampled_df, self.PORCENTAJE_TRAINING, self.MODELO_PRODUCTIVO_param_test, Nombre_Modelo)
                     
-                    CalcularDeciles(XGB_trainingData_Score, XGB_testingData_Score)
+                    self.CalcularDeciles(XGB_trainingData_Score, XGB_testingData_Score)
                     
                 if self.TIENE_TESTING == True:        
                     print( 'Testing ')
@@ -1276,9 +1295,9 @@ class Challenger():
                         self.TestingModeloSpark(self.MODELO_PRODUCTIVO, testing_df_m3, Productivo_Model_train, Nombre_Modelo + ' TESTING MES3')
                             
                     elif self.MODELO_PRODUCTIVO == 'XGB' or self.MODELO_PRODUCTIVO == 'LGBM':
-                        TestingModeloPython(self.MODELO_PRODUCTIVO, testing_df_m1, Productivo_scaler_train, Productivo__model_train, Nombre_Modelo + ' TESTING MES1')
-                        TestingModeloPython(self.MODELO_PRODUCTIVO, testing_df_m2, Productivo_scaler_train, Productivo__model_train, Nombre_Modelo + ' TESTING MES2')
-                        TestingModeloPython(self.MODELO_PRODUCTIVO, testing_df_m3, Productivo_scaler_train, Productivo__model_train, Nombre_Modelo + ' TESTING MES3')
+                        self.TestingModeloPython(self.MODELO_PRODUCTIVO, testing_df_m1, Productivo_scaler_train, Productivo__model_train, Nombre_Modelo + ' TESTING MES1')
+                        self.TestingModeloPython(self.MODELO_PRODUCTIVO, testing_df_m2, Productivo_scaler_train, Productivo__model_train, Nombre_Modelo + ' TESTING MES2')
+                        self.TestingModeloPython(self.MODELO_PRODUCTIVO, testing_df_m3, Productivo_scaler_train, Productivo__model_train, Nombre_Modelo + ' TESTING MES3')
         except:
             print('Error Modelo Productivo ')
         
@@ -1290,7 +1309,7 @@ class Challenger():
         # 4. Mejores Variables de Todos los modelos
         #############################################################################
         
-        a = spark.sql("""select variable, sum(rownum ) as rownum 
+        a = self.spark.sql("""select variable, sum(rownum ) as rownum 
                         from (select ROW_NUMBER() OVER(PARTITION BY algorithm ORDER BY importance DESC) AS rownum, * 
                                 from sdb_datamining.""" + self.modelo + """_feature_importance) 
                         group by variable
@@ -1306,7 +1325,7 @@ class Challenger():
             
         # Busco quien es el mejor en Testing
         
-        meses_testing = spark.sql("""
+        meses_testing = self.spark.sql("""
             select  replace(replace(replace(A.ALGORITHM, 'MES1', ''), 'MES2', ''), 'MES3', '') AS ALGORITHM,
                     SUM(  case when mes1.ALGORITHM = a.ALGORITHM then 1 else 0 end
                         + case when mes2.ALGORITHM = a.ALGORITHM then 1 else 0 end
@@ -1351,7 +1370,7 @@ class Challenger():
         meses_testing.createOrReplaceTempView("meses_testing")
         
         
-        modelo_ganador_testing = spark.sql("""
+        modelo_ganador_testing = self.spark.sql("""
             select  a.*
             FROM sdb_datamining.""" + self.modelo + """_metricas  A,
                         (SELECT MAX(ALGORITHM) AS ALGORITHM
@@ -1374,7 +1393,7 @@ class Challenger():
         modelo_ganador_testing.createOrReplaceTempView("modelo_ganador_testing")
         
         
-        meses_ganadores_vs_produccion = spark.sql("""
+        meses_ganadores_vs_produccion = self.spark.sql("""
             SELECT  SUM(MESES_GANADORES) AS MESES_GANADORES
             FROM (
                 SELECT  A.*,
