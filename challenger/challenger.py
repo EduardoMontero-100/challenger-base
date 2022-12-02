@@ -274,8 +274,7 @@ class Challenger():
         # Control de Particiones.....
         import pyspark.sql.functions as F
         
-        print("Number of partitions PARTY: {}".format(train_undersampled_df.rdd.getNumPartitions()))
-        
+               
         print(train_undersampled_df.count())
             
         # Particiono en 4 Partes, aca particionar en Pares dependiendo del tamaño, no muy bajo y no muy grande cada particion....
@@ -619,7 +618,8 @@ class Challenger():
         # Get column names first
         
         names_df = self.spark.sql("select * from sdb_datamining." + self.modelo + "_variables where variable not in ( 'label' , '" + self.CAMPO_CLAVE + "') order by variable  ")
-        numericCols = names_df.select('variable').rdd.flatMap(lambda x: x).collect()
+        numericCols = list(names_df.toPandas()['variable'])
+
         
         
         #numericCols = [c for c in df.columns if c not in [self.CAMPO_CLAVE,'periodo', 'origin', 'TGT', 'label']]
@@ -940,7 +940,8 @@ class Challenger():
         # Leo las variables de entrada al self.modelo
         
         names_df = self.spark.sql("select * from sdb_datamining." + self.modelo + "_variables where  variable not in ( 'label' , '" + self.CAMPO_CLAVE + "')  order by variable  ")
-        names = names_df.select('variable').rdd.flatMap(lambda x: x).collect()
+        names = list(names_df.toPandas()['variable'])
+
         
         
         
