@@ -64,6 +64,7 @@ class Challenger():
                  PERIODO_TEST3:str,
                  MODELO_PRODUCTIVO:str,
                  MODELO_PRODUCTIVO_param_test:dict,
+                 GRABAR_BINARIOS:bool,
                  spark) -> None:
         
         self.BALANCEAR_TARGET=BALANCEAR_TARGET
@@ -91,7 +92,7 @@ class Challenger():
         self.REGISTROS_X_PARTICION=REGISTROS_X_PARTICION
         self.PORCENTAJE_TRAINING=PORCENTAJE_TRAINING
         self.RF_param_test=RF_param_test
-        self.MODELO_PRODUCTIV=MODELO_PRODUCTIVO
+        self.MODELO_PRODUCTIVO=MODELO_PRODUCTIVO
         self.MODELO_PRODUCTIVO_param_test=MODELO_PRODUCTIVO_param_test
         self.GB_param_test=GB_param_test
         self.LGBM_param_test=LGBM_param_test
@@ -108,6 +109,7 @@ class Challenger():
         self.PERIODO_TEST1=PERIODO_TEST1
         self.PERIODO_TEST2=PERIODO_TEST2
         self.PERIODO_TEST3=PERIODO_TEST3
+        self.GRABAR_BINARIOS=GRABAR_BINARIOS
         self.spark=spark
 
 
@@ -540,11 +542,10 @@ class Challenger():
         
         ### Save model
         # Seleccionamos el mejor modelo y lo guardamos para compararlo con el otros modelos para luego elegir el modelo ganador
-        if 1 > 10:
-            SMALL_ALGO = Nombre_Modelo.lower()
-            BINARIO = f"{self.PERIODO}_challenger_{SMALL_ALGO}"
-        
-            cvModel3.write().overwrite().save(self.PATH + '/' + BINARIO + ".bin")
+        if self.GRABAR_BINARIOS:
+            cvModel3.write().overwrite().save(self.PATH + '/' + BINARIO + ".bin")    
+
+
             
         try:
             self.CalcularDeciles(trainingDataScore.select(self.CAMPO_CLAVE, 'label', 'Prob1').toPandas(), testDataScore.select(self.CAMPO_CLAVE, 'label', 'Prob1').toPandas())
@@ -915,13 +916,9 @@ class Challenger():
     
         ### Save model
         # Seleccionamos el mejor modelo y lo guardamos para compararlo con el otros modelos para luego elegir el modelo ganador
-        if 1 > 10:
-            SMALL_ALGO = Nombre_Modelo.lower()
-            BINARIO = f"{self.PERIODO}_challenger_{SMALL_ALGO}"
-        
+        if self.GRABAR_BINARIOS:
             scaler.write().overwrite().save(self.PATH + '/' + BINARIO + "_scaler.bin")
-            
-            clf_final_train.write().overwrite().save(self.PATH + '/' + BINARIO + "_model.bin")
+            clf_final_train.write().overwrite().save(self.PATH + '/' + BINARIO + "_model.bin")        
 
         try:
             
