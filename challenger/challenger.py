@@ -62,6 +62,8 @@ class Challenger():
                  PERIODO_TEST1:str,
                  PERIODO_TEST2:str,
                  PERIODO_TEST3:str,
+                 MODELO_PRODUCTIVO:str,
+                 MODELO_PRODUCTIVO_param_test:dict,
                  spark) -> None:
         
         self.BALANCEAR_TARGET=BALANCEAR_TARGET
@@ -89,8 +91,8 @@ class Challenger():
         self.REGISTROS_X_PARTICION=REGISTROS_X_PARTICION
         self.PORCENTAJE_TRAINING=PORCENTAJE_TRAINING
         self.RF_param_test=RF_param_test
-        self.MODELO_PRODUCTIVO:str
-        self.MODELO_PRODUCTIVO_param_test:dict
+        self.MODELO_PRODUCTIV=MODELO_PRODUCTIVO
+        self.MODELO_PRODUCTIVO_param_test=MODELO_PRODUCTIVO_param_test
         self.GB_param_test=GB_param_test
         self.LGBM_param_test=LGBM_param_test
         self.XGB_param_test=XGB_param_test
@@ -107,6 +109,7 @@ class Challenger():
         self.PERIODO_TEST2=PERIODO_TEST2
         self.PERIODO_TEST3=PERIODO_TEST3
         self.spark=spark
+
 
 
     def BorrarTablasTemporales(self ):
