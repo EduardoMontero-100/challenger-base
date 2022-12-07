@@ -1416,7 +1416,7 @@ class Challenger():
                             AND     tipo = 'PERFORMANCE'
                             group by modelo, substr(cast(fecha AS STRING),1,6) ) A
                             
-                            LEFT JOIN modelo_ganador_testing B ON A.self.PERIODO = case when b.algorithm like '% TESTING MES1' then """ + str(self.PERIODO_TEST1) + """
+                            LEFT JOIN modelo_ganador_testing B ON A.PERIODO = case when b.algorithm like '% TESTING MES1' then """ + str(self.PERIODO_TEST1) + """
                                                                                     when b.algorithm like '% TESTING MES2' then """ + str(self.PERIODO_TEST2) + """
                                                                                     when b.algorithm like '% TESTING MES3' then """ + str(self.PERIODO_TEST3) + """
                                                                             end           
