@@ -1110,7 +1110,8 @@ class Challenger():
         
         train_undersampled_df = self.spark.sql("select * from sdb_datamining." +  self.modelo + '_1')
         
-        if self.CASTEAR_BIGINT == True:
+        train_undersampled_df = self.DecimalToDouble(train_undersampled_df)
+        if self.CASTEAR_BIGINT == True: 
             train_undersampled_df = self.CastBigInt(train_undersampled_df)
             
         if self.REDONDEAR_DECIMALES == True:
@@ -1160,6 +1161,7 @@ class Challenger():
             #############################################################################
             # estos pasos tienen que ser los mismos que los realizados en la ABT de Training
             
+            train_undersampled_df = self.DecimalToDouble(train_undersampled_df)
             if self.CASTEAR_BIGINT == True:
                 test_undersampled_df = self.CastBigInt(test_undersampled_df)
                 
@@ -1424,8 +1426,19 @@ class Challenger():
         print('MESES QUE EL NUEVO MODELO LE GANA AL PRODUCTIVO: ', meses_ganadores_vs_produccion)
         
         
+    def DecimalToDouble(self, train_undersampled_df):
+    
+    
+        numericCols = [c for c in train_undersampled_df.columns if c not in [self.CAMPO_CLAVE,'periodo', 'origin', 'label']]
+        print("Num. numeric vars: " , len(numericCols))
         
+        for c_name, c_type in train_undersampled_df.dtypes:
+            if (c_type.find('decimal') >=0):
+                train_undersampled_df = train_undersampled_df.withColumn(c_name, F.col(c_name).cast('double'))
         
+        return train_undersampled_df    
+            
+            
     def EjecutarChallenger(self):
     #if 1 > 0:
         import datetime;
