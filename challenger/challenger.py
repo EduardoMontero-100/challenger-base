@@ -1,6 +1,7 @@
 import pandas as pd
 import pyspark.sql.functions as F
 from pyspark.sql.types import ShortType
+from pyspark.sql import DataFrame
 import numpy as np
 from pyspark.ml.feature import StringIndexer, VectorAssembler, StandardScaler
 from pyspark.ml.tuning import ParamGridBuilder
@@ -45,7 +46,7 @@ class Challenger():
                  TGT_BALENCEO:int, 
                  DECIMALES_VARIABLES_NUMERICAS:int, 
                  COTA_CORRELACIONES:float, 
-                 PARTICIONES:float, 
+                 REGISTROS_X_PARTICION:float, 
                  PORCENTAJE_TRAINING:float, 
                  GB_param_test:dict, 
                  LGBM_param_test:dict, 
@@ -85,7 +86,7 @@ class Challenger():
         self.TGT_BALENCEO=TGT_BALENCEO
         self.DECIMALES_VARIABLES_NUMERICAS=DECIMALES_VARIABLES_NUMERICAS
         self.COTA_CORRELACIONES=COTA_CORRELACIONES
-        self.PARTICIONES=PARTICIONES
+        self.REGISTROS_X_PARTICION=REGISTROS_X_PARTICION
         self.PORCENTAJE_TRAINING=PORCENTAJE_TRAINING
         self.RF_param_test=RF_param_test
         self.MODELO_PRODUCTIVO:str
@@ -270,10 +271,9 @@ class Challenger():
 
 
 
-    def ControlParticiones(train_undersampled_df, pCampoClave, Num_reg_particion):
+    def ControlParticiones(self, train_undersampled_df:DataFrame, pCampoClave, Num_reg_particion):
         # Control de Particiones.....
-        import pyspark.sql.functions as F
-        
+      
                
         print(train_undersampled_df.count())
             
@@ -1098,6 +1098,7 @@ class Challenger():
         
         train_undersampled_df = self.ControlParticiones(train_undersampled_df, self.PARTICIONES) 
         
+        
         train_undersampled_df.write.mode('overwrite').format('parquet').saveAsTable('sdb_datamining.' + self.modelo + '_1')
         
         ####################################################################
@@ -1116,7 +1117,7 @@ class Challenger():
             train_undersampled_df = self.EliminarCorrelaciones(train_undersampled_df, self.COTA_CORRELACIONES)
         
         
-        train_undersampled_df = self.ControlParticiones(train_undersampled_df, self.PARTICIONES) 
+        train_undersampled_df = self.ControlParticiones(train_undersampled_df, self.CAMPO_CLAVE, self.REGISTROS_X_PARTICION) 
         train_undersampled_df.write.mode('overwrite').format('parquet').saveAsTable('sdb_datamining.' +  self.modelo + '_2' )
 
         ####################################################################
