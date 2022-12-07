@@ -1096,7 +1096,7 @@ class Challenger():
         if self.BALANCEAR_TARGET  == True:
             train_undersampled_df = self.BalancearABT(train_undersampled_df, self.TGT_BALENCEO)
         
-        train_undersampled_df = self.ControlParticiones(train_undersampled_df, self.PARTICIONES) 
+        train_undersampled_df = self.ControlParticiones(train_undersampled_df, self.CAMPO_CLAVE, self.REGISTROS_X_PARTICION) 
         
         
         train_undersampled_df.write.mode('overwrite').format('parquet').saveAsTable('sdb_datamining.' + self.modelo + '_1')
@@ -1164,7 +1164,7 @@ class Challenger():
                 test_undersampled_df = self.RedondearDecimales(test_undersampled_df, self.DECIMALES_VARIABLES_NUMERICAS)
             
             
-            test_undersampled_df = self.ControlParticiones(test_undersampled_df, self.PARTICIONES) 
+            train_undersampled_df = self.ControlParticiones(train_undersampled_df, self.CAMPO_CLAVE, self.REGISTROS_X_PARTICION)
             test_undersampled_df.write.mode('overwrite').format('parquet').saveAsTable('sdb_datamining.' +  self.modelo + '_testing' )
         
         
