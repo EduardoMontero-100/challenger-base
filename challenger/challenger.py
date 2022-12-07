@@ -463,7 +463,7 @@ class Challenger():
         
         
         SMALL_ALGO = Nombre_Modelo.lower()
-        BINARIO = f"{self.self.PERIODO}_challenger_{SMALL_ALGO}"
+        BINARIO = f"{self.PERIODO}_challenger_{SMALL_ALGO}"
         
         
         model_cvresults = self.spark.createDataFrame(
@@ -718,7 +718,7 @@ class Challenger():
             print(opt_parameters)
             
             #Configure from the HP optimisation
-            def learning_rate_010_decay_power_0995(self, current_iter):
+            def learning_rate_010_decay_power_0995(current_iter):
                 base_learning_rate = 0.1
                 lr = base_learning_rate  * np.power(.995, current_iter)
                 return lr if lr > 1e-3 else 1e-3
