@@ -26,7 +26,7 @@ class ABT():
     def __init__(self,
                  MODELO:str,
                  
-                 PERIODO:str,
+                 periodo:str,
                  
                  TABLA_UNIVERSO:str,
                  
@@ -67,12 +67,13 @@ class ABT():
                  Movilidad_avg:list,
                  Movilidad_max:list,
                  
-                 ABT_VARIABLES_NSS_NUM:list,
+                 ABT_VARIABLES_NSS_NUM:str,
+,
                  
                  spark) -> None:
         
          self.MODELO=MODELO
-         self.PERIODO=PERIODO
+         self.periodo=periodo
          self.TABLA_UNIVERSO=TABLA_UNIVERSO
          self.ELIMINAR_CORRELACIONES=ELIMINAR_CORRELACIONES
          self.CASTEAR_BIGINT=CASTEAR_BIGINT
