@@ -26,7 +26,7 @@ class ABT():
     def __init__(self,
                  MODELO:str,
                  
-                 periodo:str,
+                 periodo:str, 
                  
                  TABLA_UNIVERSO:str,
                  
