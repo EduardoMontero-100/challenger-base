@@ -26,7 +26,7 @@ class ABT():
     def __init__(self,
                  MODELO:str,
                  
-                 periodo:str, 
+                 periodo:str,
                  
                  TABLA_UNIVERSO:str,
                  
@@ -68,8 +68,12 @@ class ABT():
                  Movilidad_max:list,
                  
                  ABT_VARIABLES_NSS_NUM:str,
-,
                  
+                 
+                 Prepago_avg:list,
+                 Prepago_sum:list,
+
+                
                  spark) -> None:
         
          self.MODELO=MODELO
@@ -114,6 +118,9 @@ class ABT():
          
          
          self.ABT_VARIABLES_NSS_NUM=ABT_VARIABLES_NSS_NUM
+         self.Prepago_avg=Prepago_avg
+         self.Prepago_sum=Prepago_sum
+
          
          self.spark=spark
          
@@ -156,6 +163,72 @@ class ABT():
         print('Data Frame 1: ', train_undersampled_df.count())
 
         return train_undersampled_df
+    
+    def Calcular_FTPrepago(self, pTabla_Salida):    
+        try:
+            self.spark.sql("DROP table sdb_datamining." + self.MODELO + 'ft_prepago_m_0')
+        except:
+            pass
+
+        self.spark.sql("create table sdb_datamining." + self.MODELO + """ft_prepago_m_0 as 
+                select b.*
+                FROM sdb_datamining.""" + self.MODELO + """_universo a
+                        inner join (select * 
+                                    from data_lake_analytics.ft_prepago_m  
+                                    where periodo = """ + str(self.periodo) + """
+                                    ) b on a.linea = b.linea
+                    """  )
+
+        a = self.spark.sql("""select * 
+                        from sdb_datamining.""" + self.MODELO + """ft_prepago_m_0
+                        where periodo= """ + str(self.periodo) ).drop(*['fecha_alta_contrato',  'contrato', 'numero_documento']).fillna(0)
+
+        a.write.mode('overwrite').format('parquet').saveAsTable("""sdb_datamining."""  + self.MODELO + "ft_prepago_m_1")
+
+        self.CalcularABT("""sdb_datamining."""  + self.MODELO + "ft_prepago_m_1",  'sdb_datamining.' + self.MODELO + "ft_prepago_m")
+
+        try:
+            self.spark.sql("DROP table sdb_datamining." + self.MODELO + 'ft_prepago_m_0')
+        except:
+            pass
+
+        try:
+            self.spark.sql("DROP table sdb_datamining." + self.MODELO + 'ft_prepago_m_1')
+        except:
+            pass
+
+        ft_prepago = self.spark.sql("select * from sdb_datamining." +  self.MODELO + "ft_prepago_m")
+        print(ft_prepago.count())
+        print(ft_prepago.columns)
+
+
+        # Agrupo
+
+        prepagos = self.spark.sql("select * from sdb_datamining." + self.MODELO + "ft_prepago_m limit 1").drop(*[self.CAMPO_CLAVE, self.CAMPO_AGRUPAR])
+        prepagos_avg = self.AgruparCampos(self.Prepago_avg, prepagos.columns , 'avg', 'pospago')
+        prepagos_sum = self.AgruparCampos(self.Prepago_sum, prepagos.columns , 'sum', 'pospago')
+
+
+        try:
+            self.spark.sql("drop table  " + pTabla_Salida )
+        except:
+            pass
+
+        self.spark.sql("create table " + pTabla_Salida + """ as 
+                    select """ + self.CAMPO_AGRUPAR +prepagos_avg + prepagos_sum + """
+                    from  sdb_datamining.""" + self.MODELO + """_universo a,
+                        sdb_datamining.""" + self.MODELO + """ft_prepago_m b
+                    where a.linea = b.linea
+                    group by """ + self.CAMPO_AGRUPAR)
+
+        print(self.spark.sql("select count(1) from " + pTabla_Salida).show()) 
+
+
+        try:
+            self.spark.sql("DROP table sdb_datamining." + self.MODELO + 'ft_prepago_m')
+        except:
+            pass
+        
     
     def CastBigInt(self, train_undersampled_df):
     
