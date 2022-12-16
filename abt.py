@@ -331,7 +331,7 @@ class ABT():
 
         if ((Cantidad_de_Particiones_0 % 4) >=2):
             Cantidad_de_Particiones = int(Cantidad_de_Particiones_0/4)*4+4
-        elif(Cantidad_de_Particiones_0 == 0):
+        elif(Cantidad_de_Particiones_0 <= 1):
             Cantidad_de_Particiones = 1
         else:
             Cantidad_de_Particiones = int(Cantidad_de_Particiones_0/4)*4
