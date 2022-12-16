@@ -22,7 +22,7 @@ import numpy as np
 # from sklearn.metrics import roc_auc_score, accuracy_score
 import datetime;
 class ABT():
-
+ 
     def __init__(self,
                  MODELO:str,
                  
@@ -51,7 +51,7 @@ class ABT():
                  PERIODO_PERFILES_HASTA :int,
                  NOMBRE_VARIABLES_PERFILES: str, 
                  PERIODO_SEGMENTACION_WEB:str,
-
+ 
                  pTablaMovilidad_General:str,
                  pTablaMovilidad_x_linea:str,
                  
@@ -72,7 +72,7 @@ class ABT():
                  
                  Prepago_avg:list,
                  Prepago_sum:list,
-
+ 
                 
                  spark) -> None:
         
@@ -100,7 +100,7 @@ class ABT():
          self.PERIODO_PERFILES_HASTA=PERIODO_PERFILES_HASTA
          self.NOMBRE_VARIABLES_PERFILES=NOMBRE_VARIABLES_PERFILES
          self.PERIODO_SEGMENTACION_WEB=PERIODO_SEGMENTACION_WEB
-
+ 
          self.pTablaMovilidad_General=pTablaMovilidad_General
          self.pTablaMovilidad_x_linea=pTablaMovilidad_x_linea
          
@@ -120,20 +120,20 @@ class ABT():
          self.ABT_VARIABLES_NSS_NUM=ABT_VARIABLES_NSS_NUM
          self.Prepago_avg=Prepago_avg
          self.Prepago_sum=Prepago_sum
-
+ 
          
          self.spark=spark
          
     def DecimalToDouble(self, train_undersampled_df):
-
-
+ 
+ 
         numericCols = [c for c in train_undersampled_df.columns if c not in [self.CAMPO_CLAVE,'periodo', 'origin', 'label']]
         print("Num. numeric vars: " , len(numericCols))
-
+ 
         for c_name, c_type in train_undersampled_df.dtypes:
             if (c_type.find('decimal') >=0):
                 train_undersampled_df = train_undersampled_df.withColumn(c_name, F.col(c_name).cast('double'))
-
+ 
         return train_undersampled_df             
     
     
@@ -142,26 +142,26 @@ class ABT():
         
         ### Undersampling
         # Realizamos undersampling para balancear las clases 0 y 1 del target del dataset de training, quedando una relacion 1 a 20
-
+ 
         sample0 = train_df.filter(F.col(self.TARGET) == 0).count()
         sample1 = train_df.filter(F.col(self.TARGET) == 1).count()
-
+ 
         if(sample0>=sample1):
             major_df = train_df.filter(F.col(self.TARGET) == 0)
             minor_df = train_df.filter(F.col(self.TARGET) == 1)
         else:
             major_df = train_df.filter(F.col(self.TARGET) == 1)
             minor_df = train_df.filter(F.col(self.TARGET) == 0)
-
-
+ 
+ 
         ratio = int(major_df.count()/minor_df.count())
-
+ 
         sampled_majority_df = major_df.sample(False, pBalanceo/ratio, seed=1234)
         train_undersampled_df = sampled_majority_df.unionAll(minor_df)
-
+ 
         # Aca empieza el codigo de Sebastian
         print('Data Frame 1: ', train_undersampled_df.count())
-
+ 
         return train_undersampled_df
     
     def Calcular_FTPrepago(self, pTabla_Salida):    
@@ -169,7 +169,7 @@ class ABT():
             self.spark.sql("DROP table sdb_datamining." + self.MODELO + 'ft_prepago_m_0')
         except:
             pass
-
+ 
         self.spark.sql("create table sdb_datamining." + self.MODELO + """ft_prepago_m_0 as 
                 select b.*
                 FROM """ + self.TABLA_UNIVERSO + """ a
@@ -178,52 +178,52 @@ class ABT():
                                     where periodo = """ + str(self.periodo) + """
                                     ) b on a.linea = b.linea
                     """  )
-
+ 
         a = self.spark.sql("""select * 
                         from sdb_datamining.""" + self.MODELO + """ft_prepago_m_0
                         where periodo= """ + str(self.periodo) ).drop(*['fecha_alta_contrato',  'contrato', 'numero_documento']).fillna(0)
-
+ 
         a.write.mode('overwrite').format('parquet').saveAsTable("""sdb_datamining."""  + self.MODELO + "ft_prepago_m_1")
-
+ 
         self.CalcularABT("""sdb_datamining."""  + self.MODELO + "ft_prepago_m_1",  'sdb_datamining.' + self.MODELO + "ft_prepago_m")
-
+ 
         try:
             self.spark.sql("DROP table sdb_datamining." + self.MODELO + 'ft_prepago_m_0')
         except:
             pass
-
+ 
         try:
             self.spark.sql("DROP table sdb_datamining." + self.MODELO + 'ft_prepago_m_1')
         except:
             pass
-
+ 
         ft_prepago = self.spark.sql("select * from sdb_datamining." +  self.MODELO + "ft_prepago_m")
         print(ft_prepago.count())
         print(ft_prepago.columns)
-
-
+ 
+ 
         # Agrupo
-
+ 
         prepagos = self.spark.sql("select * from sdb_datamining." + self.MODELO + "ft_prepago_m limit 1").drop(*[self.CAMPO_CLAVE, self.CAMPO_AGRUPAR])
         prepagos_avg = self.AgruparCampos(self.Prepago_avg, prepagos.columns , 'avg', 'pospago')
         prepagos_sum = self.AgruparCampos(self.Prepago_sum, prepagos.columns , 'sum', 'pospago')
-
-
+ 
+ 
         try:
             self.spark.sql("drop table  " + pTabla_Salida )
         except:
             pass
-
+ 
         self.spark.sql("create table " + pTabla_Salida + """ as 
-                    select """ + self.CAMPO_AGRUPAR +prepagos_avg + prepagos_sum + """
+                    select a.""" + self.CAMPO_AGRUPAR +prepagos_avg + prepagos_sum + """
                     from  """ + self.TABLA_UNIVERSO + """ a,
                         sdb_datamining.""" + self.MODELO + """ft_prepago_m b
                     where a.linea = b.linea
-                    group by """ + self.CAMPO_AGRUPAR)
-
+                    group by a.""" + self.CAMPO_AGRUPAR)
+ 
         print(self.spark.sql("select count(1) from " + pTabla_Salida).show()) 
-
-
+ 
+ 
         try:
             self.spark.sql("DROP table sdb_datamining." + self.MODELO + 'ft_prepago_m')
         except:
@@ -271,13 +271,13 @@ class ABT():
             train_undersampled_df = train_undersampled_df.withColumn(c_name, F.round(c_name, pDecimales))
         
         return train_undersampled_df
-
-
-
+ 
+ 
+ 
     def EliminarCorrelaciones(self, train_undersampled_df, pCota):
             
         # Saco Columnas Correlacionadas
-
+ 
         # Numerical vars
         numericCols = [c for c in train_undersampled_df.columns if c not in [self.CAMPO_CLAVE,'periodo', 'origin', 'label']]
         
@@ -285,7 +285,7 @@ class ABT():
         
         # Saco correlaciones con un 10% de la base en Pandas, :(
         
-
+ 
         
         df = train_undersampled_df.sample(fraction=0.2, seed=1234).toPandas()
         
@@ -311,9 +311,9 @@ class ABT():
         print('Variables finales: ', len(train_undersampled_df.columns))
         
         return train_undersampled_df
-
-
-
+ 
+ 
+ 
     def ControlParticiones(self, train_undersampled_df:DataFrame, pCampoClave, Num_reg_particion):
         # Control de Particiones.....
       
@@ -326,26 +326,26 @@ class ABT():
         # Ni muy chica, ni muy grande cada particion
         
         Cantidad_de_Particiones_0 = int(train_undersampled_df.count() / Num_reg_particion)
-
-
-
+ 
+ 
+ 
         if ((Cantidad_de_Particiones_0 % 4) >=2):
             Cantidad_de_Particiones = int(Cantidad_de_Particiones_0/4)*4+4
         elif(Cantidad_de_Particiones_0 <= 1):
             Cantidad_de_Particiones = 1
         else:
             Cantidad_de_Particiones = int(Cantidad_de_Particiones_0/4)*4
-
-
-
+ 
+ 
+ 
         print(Cantidad_de_Particiones)
-
+ 
         train_undersampled_df = train_undersampled_df.repartition(Cantidad_de_Particiones, pCampoClave)
         train_undersampled_df.groupBy(F.spark_partition_id()).count().show()
         
         return train_undersampled_df
         
-
+ 
     def calcularSum(self, pVar, pNombre):
       sql = ""
       sql2 = ""
@@ -389,13 +389,13 @@ class ABT():
         except:
             pass
         query = "  create table sdb_datamining." + self.MODELO + """tmp_perfiles_moviles_tx as 
-                select """ +  self.CAMPO_AGRUPAR + "," + \
+                select a.""" +  self.CAMPO_AGRUPAR + "," + \
                         sql_hits  + sql_hits2 +  "," + sql_mins +  sql_mins2 + "," + sql_mbs + sql_mbs2 + "," + sql_apps + sql_apps2 + "," + sql_dias + sql_dias2 + \
                 """ from   """ + self.TABLA_UNIVERSO + """ a, 
                            data_lake_analytics.stg_perfilesmovil_m b
                 where   b.periodo between """ + str(self.PERIODO_PERFILES_DESDE)  + """  and """ + str(self.PERIODO_PERFILES_HASTA) + """ 
                 and     a.linea = b.linea
-                group by """ + self.CAMPO_AGRUPAR
+               group by a.""" + self.CAMPO_AGRUPAR
         train_undersampled_df = self.spark.sql(query)
         
         
@@ -514,11 +514,11 @@ class ABT():
             pass
         
         self.spark.sql("create table sdb_datamining." + self.MODELO + """tmp_perfiles_moviles_pospago_nivel_agrup as 
-                    select """ + self.CAMPO_AGRUPAR + perfiles_pospago_promedios + perfiles_pospago_max + linea  + """
+                    select a.""" + self.CAMPO_AGRUPAR + perfiles_pospago_promedios + perfiles_pospago_max + linea  + """
                     from """ + self.TABLA_UNIVERSO + """ a,
                           sdb_datamining.""" + self.MODELO + """tmp_perfiles_moviles_pospago_nivel b
                     where a.linea = b.linea
-                    group by """ + self.CAMPO_AGRUPAR)
+                    group by a.""" + self.CAMPO_AGRUPAR)
            
            
         ############################################################
@@ -550,11 +550,11 @@ class ABT():
             pass
         
         self.spark.sql("create table sdb_datamining." + self.MODELO + """tmp_perfiles_moviles_prepago_nivel_agrup as 
-                    select """ + self.CAMPO_AGRUPAR + perfiles_prepago_promedios + perfiles_prepago_max  + """
+                    select a.""" + self.CAMPO_AGRUPAR + perfiles_prepago_promedios + perfiles_prepago_max  + """
                     from  """ + self.TABLA_UNIVERSO + """ a,
                           sdb_datamining.""" + self.MODELO + """tmp_perfiles_moviles_prepago_nivel b
                     where a.linea = b.linea
-                    group by """ + self.CAMPO_AGRUPAR)
+                    group by a.""" + self.CAMPO_AGRUPAR)
                     
         
         # Junto todas las de perfiles
@@ -646,11 +646,11 @@ class ABT():
             pass
             
         self.spark.sql("create table " + pTablaSalida + """ as 
-                    select """ + self.CAMPO_AGRUPAR + movilidad_provloc_max + movilidad_provloc_promedios   + """
+                    select a.""" + self.CAMPO_AGRUPAR + movilidad_provloc_max + movilidad_provloc_promedios   + """
                     from  """ + self.TABLA_UNIVERSO + """ a,
                           sdb_datamining.""" + self.MODELO + """_tmp_movilidad_v_prov_loc_lx b
                     where a.linea = b.linea
-                    group by """ + self.CAMPO_AGRUPAR)
+                    group by a.""" + self.CAMPO_AGRUPAR)
                     
         print(self.spark.sql("select count(1) from sdb_datamining." + self.MODELO + """_tmp_movilidad_v_prov_loc_lx_agrup""").show()) 
     
@@ -831,7 +831,7 @@ class ABT():
                 sum(case when edad = 71  then 1 else 0 end) as edad_mas70_q,
                 
                 sum(case when bco_cant > 0 then 1 else 0 end) as lineas_bco_cant_q,
-                avg(case when bco_cant > 0 then bco_cant end) as bco_cant_avg,
+               avg(case when bco_cant > 0 then bco_cant end) as bco_cant_avg,
                 
                 sum(case when bcra_sit_vg > 0 then 1 else 0 end) as lineas_con_bcra_sit_vg_mas0_q, 
                 sum(case when bcra_sit_vg >= 3 then 1 else 0 end) as lineas_con_bcra_sit_vg_mas2_q, 
@@ -916,11 +916,11 @@ class ABT():
             pass
         
         self.spark.sql("create table " + pTabla_Salida  + """ as 
-                select """ + self.CAMPO_AGRUPAR + movilidad_avg + movilidad_max  + """
+                select a.""" + self.CAMPO_AGRUPAR + movilidad_avg + movilidad_max  + """
                 from  """ + self.TABLA_UNIVERSO + """ a,
                       sdb_datamining.""" + self.MODELO + """tmp_movilidad_linea b
                 where a.linea = b.linea
-                group by """ + self.CAMPO_AGRUPAR)
+                group by a.""" + self.CAMPO_AGRUPAR)
                 
     
         print(self.spark.sql("select count(1) from " + pTabla_Salida ).show(1))
@@ -984,11 +984,11 @@ class ABT():
             pass
             
         self.spark.sql("create table " + pTabla_Salida + """ as 
-                    select """ + self.CAMPO_AGRUPAR +abonos_avg + abonos_sum + abonos_max + abonos_min + abonos_std  + """
+                    select a.""" + self.CAMPO_AGRUPAR +abonos_avg + abonos_sum + abonos_max + abonos_min + abonos_std  + """
                     from  """ + self.TABLA_UNIVERSO + """ a,
                           sdb_datamining.""" + self.MODELO + """ft_abonos_m b
                     where a.linea = b.linea
-                    group by """ + self.CAMPO_AGRUPAR)
+                    group by a.""" + self.CAMPO_AGRUPAR)
                     
         print(self.spark.sql("select count(1) from " + pTabla_Salida).show()) 
     
