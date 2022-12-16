@@ -172,7 +172,7 @@ class ABT():
 
         self.spark.sql("create table sdb_datamining." + self.MODELO + """ft_prepago_m_0 as 
                 select b.*
-                FROM sdb_datamining.""" + self.MODELO + """_universo a
+                FROM """ + self.TABLA_UNIVERSO + """ a
                         inner join (select * 
                                     from data_lake_analytics.ft_prepago_m  
                                     where periodo = """ + str(self.periodo) + """
@@ -216,7 +216,7 @@ class ABT():
 
         self.spark.sql("create table " + pTabla_Salida + """ as 
                     select """ + self.CAMPO_AGRUPAR +prepagos_avg + prepagos_sum + """
-                    from  sdb_datamining.""" + self.MODELO + """_universo a,
+                    from  """ + self.TABLA_UNIVERSO + """ a,
                         sdb_datamining.""" + self.MODELO + """ft_prepago_m b
                     where a.linea = b.linea
                     group by """ + self.CAMPO_AGRUPAR)
@@ -551,7 +551,7 @@ class ABT():
         
         self.spark.sql("create table sdb_datamining." + self.MODELO + """tmp_perfiles_moviles_prepago_nivel_agrup as 
                     select """ + self.CAMPO_AGRUPAR + perfiles_prepago_promedios + perfiles_prepago_max  + """
-                    from  sdb_datamining.""" + self.MODELO + """_universo a,
+                    from  """ + self.TABLA_UNIVERSO + """ a,
                           sdb_datamining.""" + self.MODELO + """tmp_perfiles_moviles_prepago_nivel b
                     where a.linea = b.linea
                     group by """ + self.CAMPO_AGRUPAR)
@@ -605,7 +605,7 @@ class ABT():
         ABT_VARIABLES = str(a.columns).replace("'", "").replace("[", "").replace("]", "")
         
         a = self.spark.sql(""" select a.linea,  """ + ABT_VARIABLES + """
-                   FROM  sdb_datamining.""" + self.MODELO + """_universo a
+                   FROM  """ + self.TABLA_UNIVERSO + """ a
                         left join (      
                                     select linea,  """ + ABT_VARIABLES + """
                                         from     """ + self.pTablaMovilidad_x_linea + """  a,
@@ -647,7 +647,7 @@ class ABT():
             
         self.spark.sql("create table " + pTablaSalida + """ as 
                     select """ + self.CAMPO_AGRUPAR + movilidad_provloc_max + movilidad_provloc_promedios   + """
-                    from  sdb_datamining.""" + self.MODELO + """_universo a,
+                    from  """ + self.TABLA_UNIVERSO + """ a,
                           sdb_datamining.""" + self.MODELO + """_tmp_movilidad_v_prov_loc_lx b
                     where a.linea = b.linea
                     group by """ + self.CAMPO_AGRUPAR)
@@ -917,7 +917,7 @@ class ABT():
         
         self.spark.sql("create table " + pTabla_Salida  + """ as 
                 select """ + self.CAMPO_AGRUPAR + movilidad_avg + movilidad_max  + """
-                from  sdb_datamining.""" + self.MODELO + """_universo a,
+                from  """ + self.TABLA_UNIVERSO + """ a,
                       sdb_datamining.""" + self.MODELO + """tmp_movilidad_linea b
                 where a.linea = b.linea
                 group by """ + self.CAMPO_AGRUPAR)
@@ -935,7 +935,7 @@ class ABT():
         
         self.spark.sql("create table sdb_datamining." + self.MODELO + """ft_abonos_m_0 as 
                    select b.*
-                   FROM sdb_datamining.""" + self.MODELO + """_universo a
+                   FROM """ + self.TABLA_UNIVERSO + """ a
                         inner join (select * 
                                     from data_lake_analytics.ft_abonos_m  
                                     where periodo = """ + str(self.periodo) + """
@@ -985,7 +985,7 @@ class ABT():
             
         self.spark.sql("create table " + pTabla_Salida + """ as 
                     select """ + self.CAMPO_AGRUPAR +abonos_avg + abonos_sum + abonos_max + abonos_min + abonos_std  + """
-                    from  sdb_datamining.""" + self.MODELO + """_universo a,
+                    from  """ + self.TABLA_UNIVERSO + """ a,
                           sdb_datamining.""" + self.MODELO + """ft_abonos_m b
                     where a.linea = b.linea
                     group by """ + self.CAMPO_AGRUPAR)
