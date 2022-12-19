@@ -389,13 +389,13 @@ class ABT():
         except:
             pass
         query = "  create table sdb_datamining." + self.MODELO + """tmp_perfiles_moviles_tx as 
-                select a.""" +  self.CAMPO_AGRUPAR + "," + \
+                select """ +  self.CAMPO_AGRUPAR + "," + \
                         sql_hits  + sql_hits2 +  "," + sql_mins +  sql_mins2 + "," + sql_mbs + sql_mbs2 + "," + sql_apps + sql_apps2 + "," + sql_dias + sql_dias2 + \
                 """ from   """ + self.TABLA_UNIVERSO + """ a, 
                            data_lake_analytics.stg_perfilesmovil_m b
                 where   b.periodo between """ + str(self.PERIODO_PERFILES_DESDE)  + """  and """ + str(self.PERIODO_PERFILES_HASTA) + """ 
                 and     a.linea = b.linea
-               group by a.""" + self.CAMPO_AGRUPAR
+                group by """ + self.CAMPO_AGRUPAR
         train_undersampled_df = self.spark.sql(query)
         
         
@@ -485,6 +485,25 @@ class ABT():
         print('columnas finales')
         print(train_undersampled_df.columns)
         
+        ############################################################
+        # Niveles
+        
+        print('Nivles')
+        self.CalcularABT("""(select *, """ + str(self.periodo) + """ as Periodo 
+                        from   sdb_datamining.""" + self.pTablaPerfinesPospagoNivles + """)""" , 'sdb_datamining.' +  self.MODELO + "tmp_perfiles_moviles_pospago_nivel")
+        
+        perfiles_pospago_niveles = self.spark.sql("select * from sdb_datamining." + self.MODELO + "tmp_perfiles_moviles_pospago_nivel")
+        print('Pospago ---> ' , perfiles_pospago_niveles.count())
+        print(perfiles_pospago_niveles.columns)
+    
+    
+        
+        self.CalcularABT("""(select *, """ + str(self.periodo) + """ as Periodo 
+                        from   sdb_datamining.""" + self.pTablaPerfinesPrepagoNivles + """)""" , 'sdb_datamining.' +  self.MODELO + "tmp_perfiles_moviles_prepago_nivel")
+        
+        perfiles_prepago_niveles = self.spark.sql("select * from sdb_datamining." + self.MODELO + "tmp_perfiles_moviles_prepago_nivel")
+        print('Prepago ---> ' ,perfiles_prepago_niveles.count())
+        print(perfiles_prepago_niveles.columns)
         
         ##########################################################
         # Agrupo
@@ -514,32 +533,14 @@ class ABT():
             pass
         
         self.spark.sql("create table sdb_datamining." + self.MODELO + """tmp_perfiles_moviles_pospago_nivel_agrup as 
-                    select a.""" + self.CAMPO_AGRUPAR + perfiles_pospago_promedios + perfiles_pospago_max + linea  + """
+                    select """ + self.CAMPO_AGRUPAR + perfiles_pospago_promedios + perfiles_pospago_max + linea  + """
                     from """ + self.TABLA_UNIVERSO + """ a,
                           sdb_datamining.""" + self.MODELO + """tmp_perfiles_moviles_pospago_nivel b
                     where a.linea = b.linea
-                    group by a.""" + self.CAMPO_AGRUPAR)
+                    group by """ + self.CAMPO_AGRUPAR)
            
            
-        ############################################################
-        # Niveles
-        
-        print('Nivles')
-        self.CalcularABT("""(select *, """ + str(self.periodo) + """ as Periodo 
-                        from   sdb_datamining.""" + self.pTablaPerfinesPospagoNivles + """)""" , 'sdb_datamining.' +  self.MODELO + "tmp_perfiles_moviles_pospago_nivel")
-        
-        perfiles_pospago_niveles = self.spark.sql("select * from sdb_datamining." + self.MODELO + "tmp_perfiles_moviles_pospago_nivel")
-        print('Pospago ---> ' , perfiles_pospago_niveles.count())
-        print(perfiles_pospago_niveles.columns)
-    
-    
-        
-        self.CalcularABT("""(select *, """ + str(self.periodo) + """ as Periodo 
-                        from   sdb_datamining.""" + self.pTablaPerfinesPrepagoNivles + """)""" , 'sdb_datamining.' +  self.MODELO + "tmp_perfiles_moviles_prepago_nivel")
-        
-        perfiles_prepago_niveles = self.spark.sql("select * from sdb_datamining." + self.MODELO + "tmp_perfiles_moviles_prepago_nivel")
-        print('Prepago ---> ' ,perfiles_prepago_niveles.count())
-        print(perfiles_prepago_niveles.columns)
+
     
         #############################################################
         # Junto
@@ -550,11 +551,11 @@ class ABT():
             pass
         
         self.spark.sql("create table sdb_datamining." + self.MODELO + """tmp_perfiles_moviles_prepago_nivel_agrup as 
-                    select a.""" + self.CAMPO_AGRUPAR + perfiles_prepago_promedios + perfiles_prepago_max  + """
+                    select """ + self.CAMPO_AGRUPAR + perfiles_prepago_promedios + perfiles_prepago_max  + """
                     from  """ + self.TABLA_UNIVERSO + """ a,
                           sdb_datamining.""" + self.MODELO + """tmp_perfiles_moviles_prepago_nivel b
                     where a.linea = b.linea
-                    group by a.""" + self.CAMPO_AGRUPAR)
+                    group by """ + self.CAMPO_AGRUPAR)
                     
         
         # Junto todas las de perfiles
@@ -589,9 +590,6 @@ class ABT():
             self.spark.sql( " drop table sdb_datamining."  + self.MODELO + "tmp_perfiles_moviles_t_2" )
         except:
             pass
-        
-        
-    #############################
               
     def CalcularMovilidad_Agrupada(self, AGRUPAR_POR, pTablaSalida):             
     
@@ -849,7 +847,7 @@ class ABT():
                 
                 """ + variables_perfiles_avg + """
                 
-        from sdb_datamining.SELLER_POSPAGOS_universo_v a
+        from sdb_datamining." + self.MODELO + "_universo_v a
         group by """ + AGRUPAR_POR )
         
         # Calculo Porcentajes
