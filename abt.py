@@ -395,7 +395,7 @@ class ABT():
                            data_lake_analytics.stg_perfilesmovil_m b
                 where   b.periodo between """ + str(self.PERIODO_PERFILES_DESDE)  + """  and """ + str(self.PERIODO_PERFILES_HASTA) + """ 
                 and     a.linea = b.linea
-                group by """ + self.CAMPO_AGRUPAR
+                group by a.""" + self.CAMPO_AGRUPAR
         train_undersampled_df = self.spark.sql(query)
         
         
@@ -533,11 +533,11 @@ class ABT():
             pass
         
         self.spark.sql("create table sdb_datamining." + self.MODELO + """tmp_perfiles_moviles_pospago_nivel_agrup as 
-                    select """ + self.CAMPO_AGRUPAR + perfiles_pospago_promedios + perfiles_pospago_max + linea  + """
+                    select a.""" + self.CAMPO_AGRUPAR + perfiles_pospago_promedios + perfiles_pospago_max + linea  + """
                     from """ + self.TABLA_UNIVERSO + """ a,
                           sdb_datamining.""" + self.MODELO + """tmp_perfiles_moviles_pospago_nivel b
                     where a.linea = b.linea
-                    group by """ + self.CAMPO_AGRUPAR)
+                    group by a.""" + self.CAMPO_AGRUPAR)
            
            
 
@@ -551,11 +551,11 @@ class ABT():
             pass
         
         self.spark.sql("create table sdb_datamining." + self.MODELO + """tmp_perfiles_moviles_prepago_nivel_agrup as 
-                    select """ + self.CAMPO_AGRUPAR + perfiles_prepago_promedios + perfiles_prepago_max  + """
+                    select a.""" + self.CAMPO_AGRUPAR + perfiles_prepago_promedios + perfiles_prepago_max  + """
                     from  """ + self.TABLA_UNIVERSO + """ a,
                           sdb_datamining.""" + self.MODELO + """tmp_perfiles_moviles_prepago_nivel b
                     where a.linea = b.linea
-                    group by """ + self.CAMPO_AGRUPAR)
+                    group by a.""" + self.CAMPO_AGRUPAR)
                     
         
         # Junto todas las de perfiles
