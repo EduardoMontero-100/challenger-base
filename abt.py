@@ -847,7 +847,7 @@ class ABT():
                 
                 """ + variables_perfiles_avg + """
                 
-        from sdb_datamining." + self.MODELO + "_universo_v a
+        from sdb_datamining.""" + self.MODELO + """_universo_v a
         group by """ + AGRUPAR_POR )
         
         # Calculo Porcentajes
