@@ -650,7 +650,7 @@ class ABT():
                     where a.linea = b.linea
                     group by a.""" + self.CAMPO_AGRUPAR)
                     
-        print(self.spark.sql("select count(1) from sdb_datamining." + self.MODELO + """_tmp_movilidad_v_prov_loc_lx_agrup""").show()) 
+        print(self.spark.sql("select count(1) from " + pTablaSalida ).show()) 
     
         
         try:
