@@ -3,23 +3,7 @@ import pyspark.sql.functions as F
 from pyspark.sql.types import ShortType
 from pyspark.sql import DataFrame
 import numpy as np
-# from pyspark.ml.feature import StringIndexer, VectorAssembler, StandardScaler
-# from pyspark.ml.tuning import ParamGridBuilder
-# from pyspark.ml.classification import GBTClassifier 
-# from pyspark.sql.functions import udf
-# from pyspark.sql.types import FloatType
-# from sklearn.model_selection import RandomizedSearchCV
-# from sklearn.model_selection import StratifiedKFold
-# from sklearn.model_selection import train_test_split
-# from pyspark.ml.tuning import CrossValidator
-# from pyspark.ml import Pipeline
-# from pyspark.ml.evaluation import BinaryClassificationEvaluator
-# from pyspark.ml.classification import RandomForestClassifier
-# import lightgbm as lgb
-# import xgboost as xgb
-# from sklearn.model_selection import GridSearchCV #Todo: Eliminar, No se usa
-# from sklearn import preprocessing
-# from sklearn.metrics import roc_auc_score, accuracy_score
+
 import datetime;
 class ABT():
  
@@ -371,21 +355,24 @@ class ABT():
             for h2 in pVar:
                 sql += ", round("+h+" / " + h2 + ", 3) as " + h + "_vs_" + h2
       return  sql
-          
-
-    def calcularPorcentajePorHora( self, pVar ):
+              
+    
+    def calcularPorcentajePorHora(  self, pVar ):
       # Cada franja horaria x categoria dividido el total de la categoria
       
       sql = ""
       sql2 = ""
       for h in pVar:
           
-        aa =  " sum(coalesce("+h+",0)) as " + h \
-             + ", sum(coalesce("+h+"_h_1, 0)) as " + h +"_h_1 " \
-             + ", sum(coalesce("+h+"_h_2, 0)) as " + h +"_h_2 " \
-             + ", sum(coalesce("+h+"_h_3, 0)) as " + h +"_h_3 " \
-             + ", sum(coalesce("+h+"_h_4, 0)) as " + h +"_h_4 " \
-             + ", sum(coalesce("+h+"_h_1, 0) + coalesce("+h+"_h_2, 0) + coalesce("+h+"_h_3, 0) + coalesce("+h+"_h_4, 0)) as total_" + h   
+        aa =  " sum(coalesce("+h+ self.NOMBRE_VARIABLES_PERFILES+",0)) as " + h \
+             + ", sum(coalesce("+h+ "_h_1" + self.NOMBRE_VARIABLES_PERFILES + ", 0)) as " + h +"_h_1 " \
+             + ", sum(coalesce("+h+ "_h_2" + self.NOMBRE_VARIABLES_PERFILES + ", 0)) as " + h +"_h_2 " \
+             + ", sum(coalesce("+h+ "_h_3" + self.NOMBRE_VARIABLES_PERFILES + ", 0)) as " + h +"_h_3 " \
+             + ", sum(coalesce("+h+ "_h_4" + self.NOMBRE_VARIABLES_PERFILES + ", 0)) as " + h +"_h_4 " \
+             + ", sum(coalesce("+h+ "_h_1" + self.NOMBRE_VARIABLES_PERFILES + """, 0) \
+                  + coalesce("""+h+ "_h_2" + self.NOMBRE_VARIABLES_PERFILES + """, 0) \
+                  + coalesce("""+h+ "_h_3" + self.NOMBRE_VARIABLES_PERFILES + """, 0)  \
+                  + coalesce("""+h+ "_h_4" + self.NOMBRE_VARIABLES_PERFILES + ", 0)) as total_" + h   
     
         bb =   " cast( (" + h + "_h_1 / " + h + " * 100) as integer) as " + h + "_h_1_porc " \
             + ", cast( (" + h + "_h_2 / " + h + " * 100) as integer) as " + h + "_h_2_porc " \
@@ -402,7 +389,9 @@ class ABT():
             
       return sql , sql2
       
-    def calcularPorcentajePorHoravsTotalHora(self,  pVar ):
+      
+      
+    def calcularPorcentajePorHoravsTotalHora( self,  pVar ):
         # Cada franja horaria x categoria dividido el total de hora
           
         sql = ""
@@ -413,16 +402,15 @@ class ABT():
         sql4 = ""
         for h in pVar:
               
-            
-            aa = " sum(coalesce("+h+"_h_1, 0)) as " + h +"_h_1 " \
-              + ", sum(coalesce("+h+"_h_2, 0)) as " + h +"_h_2 " \
-              + ", sum(coalesce("+h+"_h_3, 0)) as " + h +"_h_3 " \
-              + ", sum(coalesce("+h+"_h_4, 0)) as " + h +"_h_4 " 
+            aa = " sum(coalesce("+h+"_h_1" + self.NOMBRE_VARIABLES_PERFILES+", 0)) as " + h +"_h_1 " \
+              + ", sum(coalesce("+h+"_h_2" + self.NOMBRE_VARIABLES_PERFILES+", 0)) as " + h +"_h_2 " \
+              + ", sum(coalesce("+h+"_h_3" + self.NOMBRE_VARIABLES_PERFILES+", 0)) as " + h +"_h_3 " \
+              + ", sum(coalesce("+h+"_h_4" + self.NOMBRE_VARIABLES_PERFILES+", 0)) as " + h +"_h_4 " 
              
-            aa1 = " coalesce("+h+"_h_1, 0) "
-            aa2 = " coalesce("+h+"_h_2, 0) " 
-            aa3 = " coalesce("+h+"_h_3, 0) "
-            aa4 = " coalesce("+h+"_h_4, 0) " 
+            aa1 = " coalesce("+h+ "_h_1" + self.NOMBRE_VARIABLES_PERFILES+", 0) "
+            aa2 = " coalesce("+h+ "_h_2" + self.NOMBRE_VARIABLES_PERFILES+", 0) " 
+            aa3 = " coalesce("+h+ "_h_3" + self.NOMBRE_VARIABLES_PERFILES+", 0) "
+            aa4 = " coalesce("+h+ "_h_4" + self.NOMBRE_VARIABLES_PERFILES+", 0) " 
         
             bb1 =   " cast( (" + h + "_h_1 / total_h1 * 100) as integer) as " + h + "_h_1_vs_h1_porc " 
             bb2 =   " cast( (" + h + "_h_2 / total_h2 * 100) as integer) as " + h + "_h_2_vs_h2_porc " 
@@ -464,8 +452,8 @@ class ABT():
             
         return sql + "," + sql1 + ", " + sql2 + ", " + sql3 + ", " + sql4 \
              , psql1 + ", " + psql2 + ", " + psql3 + ", " + psql4 
+      
             
-    
     def CrearABT_Perfiles_Mensual_Agrupados(self, pTabla_Salida):
         
         # Leo la tabla mensual
@@ -475,6 +463,12 @@ class ABT():
         sql_mbs, sql_mbs2    = self.calcularSum([ x for x in perfiles_moviles.columns if x.endswith('_mbs')], 'mbs')
         sql_apps, sql_apps2  = self.calcularSum([ x for x in perfiles_moviles.columns if x.endswith('_apps')], 'apps')
         sql_dias, sql_dias2  = self.calcularSum([ x for x in perfiles_moviles.columns if x.endswith('_dias')], 'dias')
+        
+        sql_h1, sql_h12  = self.calcularSum([ x for x in perfiles_moviles.columns if x.endswith('_h_1')], 'h_1')
+        sql_h2, sql_h22  = self.calcularSum([ x for x in perfiles_moviles.columns if x.endswith('_h_2')], 'h_2')
+        sql_h3, sql_h32  = self.calcularSum([ x for x in perfiles_moviles.columns if x.endswith('_h_3')], 'h_3')
+        sql_h4, sql_h42  = self.calcularSum([ x for x in perfiles_moviles.columns if x.endswith('_h_4')], 'h_4')
+
         # Agrupo 
         try:
             query = " drop table sdb_datamining." + self.MODELO + "tmp_perfiles_moviles_tx "
@@ -484,6 +478,7 @@ class ABT():
         query = "  create table sdb_datamining." + self.MODELO + """tmp_perfiles_moviles_tx as 
                 select """ +  self.CAMPO_AGRUPAR + "," + \
                         sql_hits  + sql_hits2 +  "," + sql_mins +  sql_mins2 + "," + sql_mbs + sql_mbs2 + "," + sql_apps + sql_apps2 + "," + sql_dias + sql_dias2 + \
+                        ","  + sql_h1  + sql_h12 +  "," + sql_h2 +  sql_h22 + "," + sql_h3 + sql_h32 + "," + sql_h4 + sql_h42  + \
                 """ from   """ + self.TABLA_UNIVERSO + """ a, 
                            data_lake_analytics.stg_perfilesmovil_m b
                 where   b.periodo between """ + str(self.PERIODO_PERFILES_DESDE)  + """  and """ + str(self.PERIODO_PERFILES_HASTA) + """ 
@@ -631,9 +626,10 @@ class ABT():
         #############################################################
         # x Hora
         
+        
         perfiles_moviles = self.spark.sql(""" SELECT * FROM data_lake_analytics.stg_perfilesmovil_m  limit 10 """)
         
-        sql_mbs_h, sql_mbs2_h = self.calcularPorcentajePorHora([ x for x in perfiles_moviles.columns if x.endswith('_mbs')])
+        sql_mbs_h, sql_mbs2_h = self.calcularPorcentajePorHora([ x for x in perfiles_moviles.columns if x.endswith('_mbs')] )
         
         train_undersampled_df = self.spark.sql( """
         select """ +  self.CAMPO_AGRUPAR + "," + \
@@ -657,7 +653,7 @@ class ABT():
         
         perfiles_moviles = self.spark.sql(""" SELECT * FROM data_lake_analytics.stg_perfilesmovil_m  limit 10 """)
         
-        sql_mbs_hh, sql_mbs2_hh = calcularPorcentajePorHoravsTotalHora([ x for x in perfiles_moviles.columns if x.endswith('_mbs')])
+        sql_mbs_hh, sql_mbs2_hh = self.calcularPorcentajePorHoravsTotalHora([ x for x in perfiles_moviles.columns if x.endswith('_mbs')])
         
         
         train_undersampled_df = self.spark.sql( """
@@ -677,7 +673,7 @@ class ABT():
         train_undersampled_df = self.EliminarCorrelaciones(train_undersampled_df, self.COTA_CORRELACIONES)
         train_undersampled_df = self.ControlParticiones(train_undersampled_df, self.CAMPO_AGRUPAR, self.REGISTROS_X_PARTICION) 
         train_undersampled_df.fillna(0).write.mode('overwrite').format('parquet').saveAsTable("sdb_datamining." + self.MODELO + "tmp_perfiles_moviles_hora_xhora")
-        
+                
         #############################################################
         # Junto
         
@@ -710,7 +706,6 @@ class ABT():
         
         
         train_undersampled_df.createOrReplaceTempView("train_undersampled_df")
-        train_undersampled_df = self.CastBigInt(train_undersampled_df)
         train_undersampled_df = self.EliminarCorrelaciones(train_undersampled_df, self.COTA_CORRELACIONES)
         train_undersampled_df = self.ControlParticiones(train_undersampled_df, self.CAMPO_AGRUPAR, self.REGISTROS_X_PARTICION) 
         
