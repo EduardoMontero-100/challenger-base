@@ -371,8 +371,101 @@ class ABT():
             for h2 in pVar:
                 sql += ", round("+h+" / " + h2 + ", 3) as " + h + "_vs_" + h2
       return  sql
+          
+
+    def calcularPorcentajePorHora( self, pVar ):
+      # Cada franja horaria x categoria dividido el total de la categoria
       
+      sql = ""
+      sql2 = ""
+      for h in pVar:
+          
+        aa =  " sum(coalesce("+h+",0)) as " + h \
+             + ", sum(coalesce("+h+"_h_1, 0)) as " + h +"_h_1 " \
+             + ", sum(coalesce("+h+"_h_2, 0)) as " + h +"_h_2 " \
+             + ", sum(coalesce("+h+"_h_3, 0)) as " + h +"_h_3 " \
+             + ", sum(coalesce("+h+"_h_4, 0)) as " + h +"_h_4 " \
+             + ", sum(coalesce("+h+"_h_1, 0) + coalesce("+h+"_h_2, 0) + coalesce("+h+"_h_3, 0) + coalesce("+h+"_h_4, 0)) as total_" + h   
+    
+        bb =   " cast( (" + h + "_h_1 / " + h + " * 100) as integer) as " + h + "_h_1_porc " \
+            + ", cast( (" + h + "_h_2 / " + h + " * 100) as integer) as " + h + "_h_2_porc " \
+            + ", cast( (" + h + "_h_3 / " + h + " * 100) as integer) as " + h + "_h_3_porc " \
+            + ", cast( (" + h + "_h_4 / " + h + " * 100) as integer) as " + h + "_h_4_porc " \
+            + ", cast( (total_" + h + " / " + h + " * 100) as integer) as " + h + "_h_t_porc " 
+    
+        if sql == "":
+            sql += aa 
+            sql2 += bb
+        else:
+            sql += ", " + aa
+            sql2 += ", " + bb
+            
+      return sql , sql2
       
+    def calcularPorcentajePorHoravsTotalHora(self,  pVar ):
+        # Cada franja horaria x categoria dividido el total de hora
+          
+        sql = ""
+        
+        sql1 = ""
+        sql2 = ""
+        sql3 = ""
+        sql4 = ""
+        for h in pVar:
+              
+            
+            aa = " sum(coalesce("+h+"_h_1, 0)) as " + h +"_h_1 " \
+              + ", sum(coalesce("+h+"_h_2, 0)) as " + h +"_h_2 " \
+              + ", sum(coalesce("+h+"_h_3, 0)) as " + h +"_h_3 " \
+              + ", sum(coalesce("+h+"_h_4, 0)) as " + h +"_h_4 " 
+             
+            aa1 = " coalesce("+h+"_h_1, 0) "
+            aa2 = " coalesce("+h+"_h_2, 0) " 
+            aa3 = " coalesce("+h+"_h_3, 0) "
+            aa4 = " coalesce("+h+"_h_4, 0) " 
+        
+            bb1 =   " cast( (" + h + "_h_1 / total_h1 * 100) as integer) as " + h + "_h_1_vs_h1_porc " 
+            bb2 =   " cast( (" + h + "_h_2 / total_h2 * 100) as integer) as " + h + "_h_2_vs_h2_porc " 
+            bb3 =   " cast( (" + h + "_h_3 / total_h3 * 100) as integer) as " + h + "_h_3_vs_h3_porc " 
+            bb4 =   " cast( (" + h + "_h_4 / total_h4 * 100) as integer) as " + h + "_h_4_vs_h4_porc " 
+                
+        
+            if sql1 == "":
+                sql += aa
+                 
+                sql1 += "sum(" + aa1
+                sql2 += "sum(" + aa2
+                sql3 += "sum(" + aa3
+                sql4 += "sum(" + aa4
+                
+                psql1 = bb1
+                psql2 = bb2
+                psql3 = bb3
+                psql4 = bb4
+                
+            else: 
+                sql += ", " + aa
+            
+                sql1 += "+ " + aa1
+                sql2 += "+ " + aa2
+                sql3 += "+ " + aa3
+                sql4 += "+ " + aa4
+        
+                psql1 += ", " + bb1
+                psql2 += ", " + bb2
+                psql3 += ", " + bb3
+                psql4 += ", " + bb4
+    
+        sql1 += ") as total_h1"
+        sql2 += ") as total_h2"
+        sql3 += ") as total_h3"
+        sql4 += ") as total_h4" 
+        
+            
+        return sql + "," + sql1 + ", " + sql2 + ", " + sql3 + ", " + sql4 \
+             , psql1 + ", " + psql2 + ", " + psql3 + ", " + psql4 
+            
+    
     def CrearABT_Perfiles_Mensual_Agrupados(self, pTabla_Salida):
         
         # Leo la tabla mensual
@@ -447,10 +540,12 @@ class ABT():
         #sql_mbs4   = self.calcularVersus([ x for x in columnas if x.endswith('_mbs'  + self.NOMBRE_VARIABLES_PERFILES)], 'mbs')
         #sql_apps4  = self.calcularVersus([ x for x in columnas if x.endswith('_apps' + self.NOMBRE_VARIABLES_PERFILES)], 'apps')
         sql_dias4  = self.calcularVersus([ x for x in columnas if x.endswith('_dias' + self.NOMBRE_VARIABLES_PERFILES)], 'dias')
+        
         try:
             self.spark.sql( " drop table sdb_datamining."  + self.MODELO + "tmp_perfiles_moviles_t_1" )
         except:
             pass
+            
         # Cruza con el parque, y los que no tienen trafico les pone las columnas como cero
         # sql_mins3 + sql_mbs3 + sql_mins4 + sql_mbs4 + sql_apps3 +  sql_apps4 +
         # create table sdb_datamining.""" + self.MODELO + """tmp_perfiles_moviles_t_1 as
@@ -469,12 +564,7 @@ class ABT():
         
         #########################################################
         print('<----------------- Total ----------------->')
-        if 1 > 20 :
-            train_undersampled_df = self.spark.sql("select distinct a." + self.CAMPO_AGRUPAR + sql + \
-                                            " from """ + self.TABLA_UNIVERSO + """ a
-                                                    left join sdb_datamining.""" + self.MODELO + "tmp_perfiles_moviles_tx b on a." + self.CAMPO_AGRUPAR + " = b." + self.CAMPO_AGRUPAR
-                                                    ).select(*columnas)
-                                                    
+        
         train_undersampled_df = self.spark.sql("select " + self.CAMPO_AGRUPAR + sql + \
                                             " from sdb_datamining.""" + self.MODELO + "tmp_perfiles_moviles_t b"
                                                     ).select(*columnas)
@@ -495,8 +585,6 @@ class ABT():
         perfiles_pospago_niveles = self.spark.sql("select * from sdb_datamining." + self.MODELO + "tmp_perfiles_moviles_pospago_nivel")
         print('Pospago ---> ' , perfiles_pospago_niveles.count())
         print(perfiles_pospago_niveles.columns)
-    
-    
         
         self.CalcularABT("""(select *, """ + str(self.periodo) + """ as Periodo 
                         from   sdb_datamining.""" + self.pTablaPerfinesPrepagoNivles + """)""" , 'sdb_datamining.' +  self.MODELO + "tmp_perfiles_moviles_prepago_nivel")
@@ -539,9 +627,57 @@ class ABT():
                     where a.linea = b.linea
                     group by a.""" + self.CAMPO_AGRUPAR)
            
-           
-
     
+        #############################################################
+        # x Hora
+        
+        perfiles_moviles = self.spark.sql(""" SELECT * FROM data_lake_analytics.stg_perfilesmovil_m  limit 10 """)
+        
+        sql_mbs_h, sql_mbs2_h = self.calcularPorcentajePorHora([ x for x in perfiles_moviles.columns if x.endswith('_mbs')])
+        
+        train_undersampled_df = self.spark.sql( """
+        select """ +  self.CAMPO_AGRUPAR + "," + \
+                sql_mbs2_h + """
+        from         
+                ( select """ +  self.CAMPO_AGRUPAR + "," + \
+                        sql_mbs_h + \
+                """ from   sdb_datamining.""" + self.MODELO + """tmp_perfiles_moviles_t a
+                group by a.""" + self.CAMPO_AGRUPAR + ") a "
+        )
+        
+        train_undersampled_df.createOrReplaceTempView("train_undersampled_df")
+        train_undersampled_df = self.ControlParticiones(train_undersampled_df, self.CAMPO_AGRUPAR,  self.REGISTROS_X_PARTICION) 
+        train_undersampled_df = self.CastBigInt(train_undersampled_df)
+        train_undersampled_df = self.EliminarCorrelaciones(train_undersampled_df, self.COTA_CORRELACIONES)
+        train_undersampled_df = self.ControlParticiones(train_undersampled_df, self.CAMPO_AGRUPAR, self.REGISTROS_X_PARTICION) 
+        train_undersampled_df.fillna(0).write.mode('overwrite').format('parquet').saveAsTable("sdb_datamining." + self.MODELO + "tmp_perfiles_moviles_hora")
+        
+            
+        ## xHora 2
+        
+        perfiles_moviles = self.spark.sql(""" SELECT * FROM data_lake_analytics.stg_perfilesmovil_m  limit 10 """)
+        
+        sql_mbs_hh, sql_mbs2_hh = calcularPorcentajePorHoravsTotalHora([ x for x in perfiles_moviles.columns if x.endswith('_mbs')])
+        
+        
+        train_undersampled_df = self.spark.sql( """
+        select """ +  self.CAMPO_AGRUPAR + "," + \
+                sql_mbs2_hh + """
+        from         
+                ( select """ +  self.CAMPO_AGRUPAR + "," + \
+                        sql_mbs_hh + \
+                 """ from   sdb_datamining.""" + self.MODELO + """tmp_perfiles_moviles_t a
+                group by a.""" + self.CAMPO_AGRUPAR + ") a "
+        )
+        
+        
+        train_undersampled_df.createOrReplaceTempView("train_undersampled_df")
+        train_undersampled_df = self.ControlParticiones(train_undersampled_df, self.CAMPO_AGRUPAR,  self.REGISTROS_X_PARTICION) 
+        train_undersampled_df = self.CastBigInt(train_undersampled_df)
+        train_undersampled_df = self.EliminarCorrelaciones(train_undersampled_df, self.COTA_CORRELACIONES)
+        train_undersampled_df = self.ControlParticiones(train_undersampled_df, self.CAMPO_AGRUPAR, self.REGISTROS_X_PARTICION) 
+        train_undersampled_df.fillna(0).write.mode('overwrite').format('parquet').saveAsTable("sdb_datamining." + self.MODELO + "tmp_perfiles_moviles_hora_xhora")
+        
         #############################################################
         # Junto
         
@@ -564,11 +700,21 @@ class ABT():
         perfiles_t2 = self.spark.sql("select * from sdb_datamining." + self.MODELO + "tmp_perfiles_moviles_t_2") # Ya agrupado
         perfiles_pospago_niveles = self.spark.sql("select * from sdb_datamining." + self.MODELO + "tmp_perfiles_moviles_pospago_nivel_agrup") # ya agrupado
         perfiles_prepago_niveles = self.spark.sql("select * from sdb_datamining." + self.MODELO + "tmp_perfiles_moviles_prepago_nivel_agrup") # ya agrupado
+        perfiles_hora = self.spark.sql("select * from sdb_datamining." + self.MODELO + "tmp_perfiles_moviles_hora")  # ya agrupado 
+        perfiles_hora_xhora = self.spark.sql("select * from sdb_datamining." + self.MODELO + "tmp_perfiles_moviles_hora_xhora")  # ya agrupado
         
-        abt_perfiles_dni = perfiles_t0.join(perfiles_t1, [self.CAMPO_AGRUPAR], 'inner').join(perfiles_t2, [self.CAMPO_AGRUPAR], 'inner')\
-                                .join(perfiles_prepago_niveles, [self.CAMPO_AGRUPAR], 'inner').join(perfiles_pospago_niveles, [self.CAMPO_AGRUPAR], 'inner')
         
-        abt_perfiles_dni.write.mode('overwrite').format('parquet').saveAsTable(pTabla_Salida)
+        train_undersampled_df = perfiles_t0.join(perfiles_t1, [self.CAMPO_AGRUPAR], 'inner').join(perfiles_t2, [self.CAMPO_AGRUPAR], 'inner')\
+                                .join(perfiles_prepago_niveles, [self.CAMPO_AGRUPAR], 'inner').join(perfiles_pospago_niveles, [self.CAMPO_AGRUPAR], 'inner')\
+                                .join(perfiles_hora, [self.CAMPO_AGRUPAR], 'inner').join(perfiles_hora_xhora, [self.CAMPO_AGRUPAR], 'inner')
+        
+        
+        train_undersampled_df.createOrReplaceTempView("train_undersampled_df")
+        train_undersampled_df = self.CastBigInt(train_undersampled_df)
+        train_undersampled_df = self.EliminarCorrelaciones(train_undersampled_df, self.COTA_CORRELACIONES)
+        train_undersampled_df = self.ControlParticiones(train_undersampled_df, self.CAMPO_AGRUPAR, self.REGISTROS_X_PARTICION) 
+        
+        train_undersampled_df.write.mode('overwrite').format('parquet').saveAsTable(pTabla_Salida)
     
     
         try:
@@ -591,6 +737,21 @@ class ABT():
         except:
             pass
               
+        
+        try:
+            self.spark.sql( " drop table sdb_datamining."  + self.MODELO + "tmp_perfiles_moviles_hora" )
+        except:
+            pass
+            
+        try:
+            self.spark.sql( " drop table sdb_datamining."  + self.MODELO + "tmp_perfiles_moviles_hora_xhora" )
+        except:
+            pass
+            
+            
+            
+    
+            
     def CalcularMovilidad_Agrupada(self, AGRUPAR_POR, pTablaSalida):             
     
         # Cruzo con tola la info que necesito             
