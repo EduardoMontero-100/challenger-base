@@ -39,6 +39,8 @@ class ABT():
                  pTablaMovilidad_General:str,
                  pTablaMovilidad_x_linea:str,
                  
+                 pTablaNosis:str,
+                 
                  Abonos_avg:list,
                  Abonos_sum:list,
                  Abonos_max:list,
@@ -105,6 +107,7 @@ class ABT():
          self.Prepago_avg=Prepago_avg
          self.Prepago_sum=Prepago_sum
  
+         self.pTablaNosis =pTablaNosis
          
          self.spark=spark
          
@@ -833,8 +836,8 @@ class ABT():
             select distinct a.dni, """ + self.ABT_VARIABLES_NSS_NUM + """
             from    (select distinct dni 
                     from sdb_datamining.""" + self.MODELO + """_universo) a
-            left join (select distinct cast(trim(substring(doc_nro, 3, 8)) as string) as dni, """ + self.ABT_VARIABLES_NSS_NUM + """ 
-                        from sdb_datamining.cdas_nss_validados_external) b 
+            left join (select distinct dni, """ + self.ABT_VARIABLES_NSS_NUM + """ 
+                        from """ + self.pTablaNosis + """) b 
                 on a.dni = b.dni"""
         self.spark.sql(query)
         
@@ -1077,6 +1080,10 @@ class ABT():
                 group by a.""" + self.CAMPO_AGRUPAR)
                 
     
+        try:
+            self.spark.sql("drop table sdb_datamining." + self.MODELO + "tmp_movilidad_linea")
+        except:
+            pass
         print(self.spark.sql("select count(1) from " + pTabla_Salida ).show(1))
         
     
