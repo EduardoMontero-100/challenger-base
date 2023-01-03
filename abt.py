@@ -192,8 +192,8 @@ class ABT():
         # Agrupo
  
         prepagos = self.spark.sql("select * from sdb_datamining." + self.MODELO + "ft_prepago_m limit 1").drop(*[self.CAMPO_CLAVE, self.CAMPO_AGRUPAR])
-        prepagos_avg = self.AgruparCampos(self.Prepago_avg, prepagos.columns , 'avg', 'pospago')
-        prepagos_sum = self.AgruparCampos(self.Prepago_sum, prepagos.columns , 'sum', 'pospago')
+        prepagos_avg = self.AgruparCampos(self.Prepago_avg, prepagos.columns , 'avg', 'prepago')
+        prepagos_sum = self.AgruparCampos(self.Prepago_sum, prepagos.columns , 'sum', 'prepago')
  
  
         try:
@@ -753,8 +753,8 @@ class ABT():
     def CalcularMovilidad_Agrupada(self, AGRUPAR_POR, pTablaSalida):             
     
         # Cruzo con tola la info que necesito             
-        pTablaSalida = " sdb_datamining." + self.MODELO + "_movilidad_v_prov_loc "
-        self.CalcularVariablesGeolocalizacion(AGRUPAR_POR, self.pTablaMovilidad_General, pTablaSalida)
+        pTablaSalida_temp = " sdb_datamining." + self.MODELO + "_movilidad_v_prov_loc "
+        self.CalcularVariablesGeolocalizacion(AGRUPAR_POR, self.pTablaMovilidad_General, pTablaSalida_temp)
         
         # Cruzo con el universo
         
