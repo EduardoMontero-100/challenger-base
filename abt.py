@@ -750,7 +750,7 @@ class ABT():
             
     
             
-    def CalcularMovilidad_Agrupada(self, AGRUPAR_POR, pTablaSalida):             
+    def CalcularMovilidad_Agrupada(self, AGRUPAR_POR, pNombreVars, pTablaSalida):             
     
         # Cruzo con tola la info que necesito             
         pTablaSalida_temp = " sdb_datamining." + self.MODELO + "_movilidad_v_prov_loc "
@@ -761,6 +761,14 @@ class ABT():
         a = self.spark.sql(" select * from sdb_datamining." + self.MODELO + "_movilidad_v_prov_loc limit 1").drop(self.CAMPO_CLAVE, 'periodo', 'provincia', 'localidad_barrio')
         ABT_VARIABLES = str(a.columns).replace("'", "").replace("[", "").replace("]", "")
         
+        
+        if (str(AGRUPAR_POR).upper().replace(' ', '')) == 'CELDA':
+            Join = " a.vive_celda = b.celda "
+                    
+        else:
+            Join = " a.vive_provincia = b.provincia and a.vive_localidad_barrio = b.localidad_barrio "
+            
+                                             
         a = self.spark.sql(""" select a.linea,  """ + ABT_VARIABLES + """
                    FROM  """ + self.TABLA_UNIVERSO + """ a
                         left join (      
@@ -768,7 +776,7 @@ class ABT():
                                         from     """ + self.pTablaMovilidad_x_linea + """  a,
                                                 
                                                 sdb_datamining.""" + self.MODELO + """_movilidad_v_prov_loc b 
-                                    where a.vive_provincia = b.provincia and a.vive_localidad_barrio = b.localidad_barrio
+                                    where  """ + Join + """
                                     ) b on a.linea = b.linea
                    
                         """  ).fillna(0)
@@ -790,10 +798,10 @@ class ABT():
         a = self.spark.sql(" select * from sdb_datamining." + self.MODELO + "_movilidad_v_prov_loc limit 1").drop(self.CAMPO_CLAVE, 'periodo', 'provincia', 'localidad_barrio')
         
         movilidad_provloc = self.spark.sql("select * from sdb_datamining." + self.MODELO + "_tmp_movilidad_v_prov_loc_lx limit 1").drop(*[self.CAMPO_CLAVE, self.CAMPO_AGRUPAR])
-        movilidad_provloc_max = self.AgruparCampos(a.columns, movilidad_provloc.columns , 'max', 'pospago')
+        movilidad_provloc_max = self.AgruparCampos(a.columns, movilidad_provloc.columns , 'max', pNombreVars)
         
         if self.AGRUPAR == True:
-            movilidad_provloc_promedios = self.AgruparCampos(a.columns, movilidad_provloc.columns , 'avg', 'pospago')
+            movilidad_provloc_promedios = self.AgruparCampos(a.columns, movilidad_provloc.columns , 'avg', pNombreVars)
         else:
             movilidad_provloc_promedios = ""
         
