@@ -966,7 +966,7 @@ class Challenger():
             pickle.dump(scaler, open(self.TMP_PATH + "/" + scaler_filename, 'wb'))
             print(f"Guardado el archivo temporal a {self.TMP_PATH}/{scaler_filename}")
             
-            hdfsput = os.Popen(["hdfs", "dfs", "-copyFromLocal", "-f", 
+            hdfsput = os.popen(["hdfs", "dfs", "-copyFromLocal", "-f", 
                             self.TMP_PATH + "/" + scaler_filename, 
                             self.PATH + "/" + scaler_filename], 
                             stdin=PIPE, bufsize=-1)
@@ -977,7 +977,7 @@ class Challenger():
             pickle.dump(clf_final_train, open(self.TMP_PATH + "/" + model_filename, 'wb'))
             print(f"Guardado el archivo temporal en {self.TMP_PATH}/{model_filename}")
 
-            hdfsput = os.Popen(["hdfs", "dfs", "-copyFromLocal", "-f", 
+            hdfsput = os.popen(["hdfs", "dfs", "-copyFromLocal", "-f", 
                             self.TMP_PATH + "/" + model_filename, 
                             self.PATH + "/" + model_filename], 
                             stdin=PIPE, bufsize=-1)
