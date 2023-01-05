@@ -121,9 +121,9 @@ class Challenger():
         self.formato='parquet'
         ## Paths
         # Path HDFS
-        self.PATH=os.path.join("/adv/DM/datastore/DS_sandbox", modelo)
+        self.PATH=os.path.join("/adv/modelos/", modelo, "challenger")
         # Path Local
-        self.TMP_PATH=os.path.join("/tmp/adv/modelos", modelo, "challenger")
+        self.TMP_PATH=os.path.join("/tmp/adv/DM/datastore/DS_sandbox", modelo)
 
 
     def BorrarTablasTemporales(self ):
