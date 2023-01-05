@@ -121,7 +121,8 @@ class Challenger():
         self.formato='parquet'
         ## Paths
         # Path HDFS
-        self.PATH=os.path.join("/adv/modelos/", modelo, "challenger")
+        self.PATH_MODELO = os.path.join("/adv/modelos/", modelo)
+        self.PATH=os.path.join(self.PATH_MODELO, "challenger")
         # Path Local
         self.TMP_PATH=os.path.join("/tmp/adv/DM/datastore/DS_sandbox", modelo)
 
@@ -568,9 +569,15 @@ class Challenger():
         ### Save model
         # Seleccionamos el mejor modelo y lo guardamos para compararlo con el otros modelos para luego elegir el modelo ganador
         if self.GRABAR_BINARIOS:
+
+            # Crear carpeta HDFS
+            os.popen(f'hadoop fs -mkdir -p {self.PATH}')
+            # Guarda binario
             assert BINARIO
             path_binario = os.path.join(self.PATH, BINARIO + ".bin")
             cvModel3.write().overwrite().save(path_binario)    
+            # Dar permisos
+            os.popen(f"hadoop dfs -chmod -R 770 {self.PATH_MODELO}")
 
 
             
@@ -962,6 +969,10 @@ class Challenger():
             if not exists:
                 os.makedirs(self.TMP_PATH)
 
+            # Crear carpeta HDFS
+            os.popen(f'hadoop fs -mkdir -p {self.PATH}')
+            
+
             assert BINARIO
             scaler_filename = BINARIO + "_scaler.bin"
             model_filename = BINARIO + "_model.bin"
@@ -1000,6 +1011,11 @@ class Challenger():
             # Delete tmp file
             if os.path.exists(tmp_path_scaler):
                 os.remove(tmp_path_scaler)
+
+
+            # Dar permisos
+            os.popen(f"hadoop dfs -chmod -R 770 {self.PATH_MODELO}")
+
 
         try:
             
