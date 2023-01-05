@@ -41,7 +41,6 @@ class Challenger():
                  CAMPO_CLAVE:str,
                  TARGET:str, 
                  modelo:str,
-                 PATH:str,
                  ABT_VARIABLES:str,
                  ABT_TABLA:str, 
                  TGT_TABLA:str, 
@@ -69,8 +68,8 @@ class Challenger():
                  MODELO_PRODUCTIVO_param_test:dict,
                  GRABAR_BINARIOS:bool,
                  spark,
+                 PATH:str='',
                  modelo_text:str='',
-                 TMP_PATH:str='',
                  ambiente:str="sdb_datamining") -> None:
         
         self.BALANCEAR_TARGET=BALANCEAR_TARGET
@@ -87,7 +86,6 @@ class Challenger():
         self.CAMPO_CLAVE=CAMPO_CLAVE
         self.TARGET=TARGET
         self.modelo=modelo
-        self.PATH=PATH
         self.ABT_VARIABLES=ABT_VARIABLES
         self.ABT_TABLA=ABT_TABLA
         self.TGT_TABLA=TGT_TABLA
@@ -120,9 +118,12 @@ class Challenger():
 
         self.modelo_text=modelo_text
         self.ambiente=ambiente
-        self.TMP_PATH=TMP_PATH
         self.formato='parquet'
-
+        ## Paths
+        # Path HDFS
+        self.PATH=os.path.join("/adv/DM/datastore/DS_sandbox", modelo)
+        # Path Local
+        self.TMP_PATH=os.path.join("/tmp/adv/modelos", modelo, "challenger")
 
 
     def BorrarTablasTemporales(self ):
@@ -567,7 +568,9 @@ class Challenger():
         ### Save model
         # Seleccionamos el mejor modelo y lo guardamos para compararlo con el otros modelos para luego elegir el modelo ganador
         if self.GRABAR_BINARIOS:
-            cvModel3.write().overwrite().save(self.PATH + '/' + BINARIO + ".bin")    
+            assert BINARIO
+            path_binario = os.path.join(self.PATH, BINARIO + ".bin")
+            cvModel3.write().overwrite().save(path_binario)    
 
 
             
@@ -959,30 +962,44 @@ class Challenger():
             if not exists:
                 os.makedirs(self.TMP_PATH)
 
+            assert BINARIO
             scaler_filename = BINARIO + "_scaler.bin"
             model_filename = BINARIO + "_model.bin"
 
-            # Save scaler
-            pickle.dump(scaler, open(self.TMP_PATH + "/" + scaler_filename, 'wb'))
-            print(f"Guardado el archivo temporal a {self.TMP_PATH}/{scaler_filename}")
-            
+            ## Save scaler
+            # Save tmp file in local
+            tmp_path_scaler = os.path.join(self.TMP_PATH, scaler_filename)
+            pickle.dump(scaler, open( tmp_path_scaler, 'wb'))
+            print(f"Guardado el archivo temporal a {tmp_path_scaler}")
+            # Copy tmp file to hdfs
+            path_scaler = os.path.join(self.PATH, scaler_filename)
             hdfsput = Popen(["hdfs", "dfs", "-copyFromLocal", "-f", 
-                            self.TMP_PATH + "/" + scaler_filename, 
-                            self.PATH + "/" + scaler_filename], 
+                            tmp_path_scaler, 
+                            path_scaler], 
                             stdin=PIPE, bufsize=-1)
             hdfsput.communicate()
-            print(f"Copiado el archivo a {self.PATH}/{scaler_filename}")
+            print(f"Copiado el archivo a {path_scaler}")
+            # Delete tmp file
+            if os.path.exists(tmp_path_scaler):
+                os.remove(tmp_path_scaler)
             
-            # Save model
-            pickle.dump(clf_final_train, open(self.TMP_PATH + "/" + model_filename, 'wb'))
-            print(f"Guardado el archivo temporal en {self.TMP_PATH}/{model_filename}")
 
+            ## Save model
+            # Save tmp file in local
+            tmp_path_model = os.path.join(self.TMP_PATH, model_filename)
+            pickle.dump(clf_final_train, open(tmp_path_model, 'wb'))
+            print(f"Guardado el archivo temporal en {tmp_path_model}")
+            # Copy tmp file to hdfs
+            path_model = os.path.join(self.PATH, model_filename)
             hdfsput = Popen(["hdfs", "dfs", "-copyFromLocal", "-f", 
-                            self.TMP_PATH + "/" + model_filename, 
-                            self.PATH + "/" + model_filename], 
+                            tmp_path_model, 
+                            path_model], 
                             stdin=PIPE, bufsize=-1)
             hdfsput.communicate()
-            print(f"Copiado el archivo a {self.PATH}/{model_filename}")    
+            print(f"Copiado el archivo a {path_model}")    
+            # Delete tmp file
+            if os.path.exists(tmp_path_scaler):
+                os.remove(tmp_path_scaler)
 
         try:
             
