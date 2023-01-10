@@ -1,4 +1,7 @@
 import pandas as pd
+import os
+import pickle
+from subprocess import PIPE, Popen
 import pyspark.sql.functions as F
 from pyspark.sql.types import ShortType
 from pyspark.sql import DataFrame
@@ -38,7 +41,6 @@ class Challenger():
                  CAMPO_CLAVE:str,
                  TARGET:str, 
                  modelo:str,
-                 PATH:str,
                  ABT_VARIABLES:str,
                  ABT_TABLA:str, 
                  TGT_TABLA:str, 
@@ -65,7 +67,10 @@ class Challenger():
                  MODELO_PRODUCTIVO:str,
                  MODELO_PRODUCTIVO_param_test:dict,
                  GRABAR_BINARIOS:bool,
-                 spark) -> None:
+                 spark,
+                 PATH:str='',
+                 modelo_text:str='',
+                 ambiente:str="sdb_datamining") -> None:
         
         self.BALANCEAR_TARGET=BALANCEAR_TARGET
         self.ELIMINAR_CORRELACIONES=ELIMINAR_CORRELACIONES
@@ -81,7 +86,6 @@ class Challenger():
         self.CAMPO_CLAVE=CAMPO_CLAVE
         self.TARGET=TARGET
         self.modelo=modelo
-        self.PATH=PATH
         self.ABT_VARIABLES=ABT_VARIABLES
         self.ABT_TABLA=ABT_TABLA
         self.TGT_TABLA=TGT_TABLA
@@ -112,28 +116,41 @@ class Challenger():
         self.GRABAR_BINARIOS=GRABAR_BINARIOS
         self.spark=spark
 
+        self.modelo_text=modelo_text
+        self.ambiente=ambiente
+        self.formato='parquet'
+        ## Paths
+        # Path HDFS
+        self.PATH_MODELO = os.path.join("/adv/modelos/", modelo)
+        self.PATH=os.path.join(self.PATH_MODELO, "challenger")
+        # Path Local
+        self.TMP_PATH=os.path.join("/tmp/adv/DM/datastore/DS_sandbox", modelo)
 
 
     def BorrarTablasTemporales(self ):
 
         try:
-            self.spark.sql(' drop table sdb_datamining.' + self.modelo + '_0' )
+            print("INFORMACION DE SEGUIMIENTO: DROP TABLA _0")
+            self.spark.sql(' drop table ' + self.ambiente + '.tmp_challenger_' + self.modelo + '_0 PURGE' )
         except:
             pass
 
         try:
-            self.spark.sql(' drop table sdb_datamining.' + self.modelo + '_1' )
+            print("INFORMACION DE SEGUIMIENTO: DROP TABLA _1")
+            self.spark.sql(' drop table ' + self.ambiente + '.tmp_challenger_' + self.modelo + '_1 PURGE'  )
         except:
             pass
 
         try:
-            self.spark.sql(' drop table sdb_datamining.' + self.modelo + '_2' )
+            print("INFORMACION DE SEGUIMIENTO: DROP TABLA _2")
+            self.spark.sql(' drop table ' + self.ambiente + '.tmp_challenger_' + self.modelo + '_2 PURGE'  )
         except:
             pass
 
 
         try:
-            self.spark.sql(' drop table sdb_datamining.' + self.modelo + '_testing' )
+            print("INFORMACION DE SEGUIMIENTO: DROP TABLA _testing")
+            self.spark.sql(' drop table ' + self.ambiente + '.tmp_challenger_' + self.modelo + '_testing PURGE' )
         except:
             pass
         
@@ -144,22 +161,33 @@ class Challenger():
         # Estas 2 son las que hay que grabar....
         
         try:
-            self.spark.sql(' drop table sdb_datamining.' + self.modelo + '_metricas' )
+            print("INFORMACION DE SEGUIMIENTO: DROP TABLA _metricas")
+            self.spark.sql(' drop table ' + self.ambiente + '.tmp_challenger_' + self.modelo + '_metricas PURGE' )
         except:
             pass
         
         
         try:
-            self.spark.sql(' drop table sdb_datamining.' + self.modelo + '_feature_importance' )
+            print("INFORMACION DE SEGUIMIENTO: DROP TABLA _feature_importance")
+            self.spark.sql(' drop table ' + self.ambiente + '.tmp_challenger_' + self.modelo + '_feature_importance PURGE' )
         except:
             pass
         
         
         try:
-            self.spark.sql(' drop table sdb_datamining.' + self.modelo + '_feature_importance_rank' )
+            print("INFORMACION DE SEGUIMIENTO: DROP TABLA _feature_importance_rank")
+            self.spark.sql(' drop table ' + self.ambiente + '.tmp_challenger_' + self.modelo + '_feature_importance_rank PURGE' )
         except:
             pass
-
+        
+        
+        try:
+            print("INFORMACION DE SEGUIMIENTO: DROP TABLA _predicciones")
+            self.spark.sql(' drop table ' + self.ambiente + '.tmp_challenger_' + self.modelo + '_predicciones PURGE' )
+        except:
+            pass
+        
+        
     def BalancearABT(self, train_df,  pBalanceo):
         
         
@@ -413,10 +441,12 @@ class Challenger():
         
         hyperparametros = bestModel.extractParamMap()
         
+        print("""
         ##############################################
         # Enteno el mejor Modelo
         ##############################################
-        
+        """)
+
         if pALGORITHM == 'RF':
                 
             numTrees = bestModel.getOrDefault('numTrees')
@@ -460,9 +490,11 @@ class Challenger():
         
         # Run cross-validation, and choose the best set of parameters.
         cvModel3 = pipeline3.fit(trainingData)
-    
+
+        print("""
         ##########################################
         # Variables Importantes
+        """)
         feat_imp = pd.DataFrame((cvModel3.stages[-1].bestModel.featureImportances.toArray()), index=numericCols).reset_index()
         feat_imp.columns =['variable', 'importance']
         
@@ -482,10 +514,10 @@ class Challenger():
         
 
         try:
-            a = self.spark.sql("select count(1) from sdb_datamining." + self.modelo + '_feature_importance')
-            model_cvresults.write.mode('append').format('parquet').saveAsTable('sdb_datamining.' + self.modelo + '_feature_importance')
+            a = self.spark.sql("select count(1) from " + self.ambiente + '.tmp_challenger_' + self.modelo + '_feature_importance')
+            model_cvresults.write.mode('append').format(self.formato).saveAsTable(self.ambiente + '.tmp_challenger_' + self.modelo + '_feature_importance')
         except:
-            model_cvresults.write.mode('overwrite').format('parquet').saveAsTable('sdb_datamining.' + self.modelo + '_feature_importance')
+            model_cvresults.write.mode('overwrite').format(self.formato).saveAsTable(self.ambiente + '.tmp_challenger_' + self.modelo + '_feature_importance')
         
         
         
@@ -532,18 +564,28 @@ class Challenger():
         # Cambiar esto con la tabla original
         
         try:
-            a = self.spark.sql("select count(1) from sdb_datamining." + self.modelo + '_metricas')
-            model_cvresults.write.mode('append').format('parquet').saveAsTable('sdb_datamining.' + self.modelo + '_metricas')
+            a = self.spark.sql("select count(1) from " + self.ambiente + '.tmp_challenger_' + self.modelo + '_metricas')
+            model_cvresults.write.mode('append').format(self.formato).saveAsTable(self.ambiente + '.tmp_challenger_' + self.modelo + '_metricas')
         except:
-            model_cvresults.write.mode('overwrite').format('parquet').saveAsTable('sdb_datamining.' + self.modelo + '_metricas')
+            model_cvresults.write.mode('overwrite').format(self.formato).saveAsTable(self.ambiente + '.tmp_challenger_' + self.modelo + '_metricas')
         
+        print("""
         ###############################################
         # Sacar para grabar
-        
+        """)
+
         ### Save model
         # Seleccionamos el mejor modelo y lo guardamos para compararlo con el otros modelos para luego elegir el modelo ganador
         if self.GRABAR_BINARIOS:
-            cvModel3.write().overwrite().save(self.PATH + '/' + BINARIO + ".bin")    
+
+            # Crear carpeta HDFS
+            os.popen(f'hadoop fs -mkdir -p {self.PATH}')
+            # Guarda binario
+            assert BINARIO
+            path_binario = os.path.join(self.PATH, BINARIO + ".bin")
+            cvModel3.write().overwrite().save(path_binario)    
+            # Dar permisos
+            os.popen(f"hadoop dfs -chmod -R 770 {self.PATH_MODELO}")
 
 
             
@@ -553,11 +595,12 @@ class Challenger():
             print('Error Calcular Deciles')
         return cvModel3
 
-    def TestingModeloSpark(self, pALGORITHM, testing_df, pModel_train, Nombre_Modelo):
-                
+    def TestingModeloSpark(self, pALGORITHM, testing_df, pModel_train, Nombre_Modelo, periodo_testing):
+
+        print("""    
         ###################################################
         # Scoreo
-        
+        """)
 
             
         evaluator=BinaryClassificationEvaluator()
@@ -567,9 +610,11 @@ class Challenger():
         print('*'*20)
         print('auc 2 ', auc_cv)
         
+        print("""
         ###################################################
         # Grabo Resultados
-        
+        """)
+
         df_values_lst = []
         df_values_lst.append((self.PERIODO, Nombre_Modelo , "AUC_TESTEO", str(auc_cv)))
         
@@ -579,8 +624,40 @@ class Challenger():
         model_cvresults = model_cvresults.withColumn("bin", F.lit(BINARIO))
         model_cvresults = model_cvresults.select("algorithm", "metric_desc", "metric_value", "periodo", "bin")
         
-        model_cvresults.write.mode('append').format('parquet').saveAsTable('sdb_datamining.' + self.modelo + '_metricas')
+        model_cvresults.write.mode('append').format(self.formato).saveAsTable(self.ambiente + '.tmp_challenger_' + self.modelo + '_metricas')
         
+        
+        print("""
+        ###################################################
+        # Grabo Predicciones
+        """)
+
+        import pyspark.sql.functions as F
+        from pyspark.sql.types import DoubleType
+        
+        prediction_final = testDataScore_Val.withColumn('prob_1', F.round(F.udf(lambda x: x.tolist()[1], DoubleType())(F.col('probability')), 4))
+        
+        model_cvresults = prediction_final.select([self.CAMPO_CLAVE, 'prob_1'])
+        
+        SMALL_ALGO = Nombre_Modelo.lower()
+        BINARIO = f"{self.PERIODO}_challenger_{SMALL_ALGO}"
+        
+        
+        model_cvresults = model_cvresults.withColumn("bin", F.lit(BINARIO))\
+                                        .withColumn("periodo", F.lit(self.PERIODO))\
+                                        .withColumn("algorithm", F.lit(Nombre_Modelo))\
+                                        .withColumn("periodo_testing", F.lit(periodo_testing))
+        
+        try:
+            a = self.spark.sql("select count(1) from " + self.ambiente + '.tmp_challenger_' + self.modelo + '_predicciones')
+            model_cvresults.write.mode('append').format(self.formato).saveAsTable(self.ambiente + '.tmp_challenger_' + self.modelo + '_predicciones')
+        except:
+            model_cvresults.write.mode('overwrite').format(self.formato).saveAsTable(self.ambiente + '.tmp_challenger_' + self.modelo + '_predicciones')
+
+        
+        
+        
+
         
     def EntrenarModeloPandas(self, pALGORITHM, train_undersampled_df, Training_Porcentaje, param_test, Nombre_Modelo):
     #Training_Porcentaje = 0.1
@@ -608,20 +685,22 @@ class Challenger():
         except:
             pass
         
-        
+        print("""
         ####################################################
         # Train y test
-        
+        """)
+
         X_train, X_test = train_test_split(df.copy(), test_size=0.3, random_state=42, stratify=df['TGT']);  
         
-        
+        print("""
         ###################################################
         # Standarizar 
         ###################################################
-        
+        """)
+
         # Get column names first
         
-        names_df = self.spark.sql("select * from sdb_datamining." + self.modelo + "_variables where variable not in ( 'label' , '" + self.CAMPO_CLAVE + "') order by variable  ")
+        names_df = self.spark.sql("select * from " + self.ambiente + '.tmp_challenger_' + self.modelo + "_variables where variable not in ( 'label' , '" + self.CAMPO_CLAVE + "') order by variable  ")
         numericCols = list(names_df.toPandas()['variable'])
 
         
@@ -713,10 +792,12 @@ class Challenger():
             # principales variables
             feat_imp = pd.Series(gs.best_estimator_.feature_importances_, index=X_train[numerical_cols].columns)
             
+            print("""
             ############################
             # El mejor modelo
             ############################
-            
+            """)
+
             opt_parameters = gs.best_estimator_.get_params()
             
             print(opt_parameters)
@@ -773,10 +854,12 @@ class Challenger():
             
             gs.fit(X_train[numerical_cols],X_train[target_column])
             
+            print("""
             ############################
             # El mejor modelo
             ############################
-            
+            """)
+
             opt_parameters = gs.best_estimator_.get_params()
             
             print(opt_parameters)
@@ -806,9 +889,11 @@ class Challenger():
             #Train the final model with learning rate decay
             clf_final_train = xgb_model.fit(X_train[ numerical_cols ], X_train[target_column] )
 
-        
+        print("""
         ##########################################
         # Variables Importantes
+        """)
+
         feat_imp = pd.DataFrame(clf_final_train.feature_importances_, index=X_train[numerical_cols].columns).reset_index()
         feat_imp.columns =['variable', 'importance']
         
@@ -830,10 +915,10 @@ class Challenger():
         
 
         try:
-            a = self.spark.sql("select count(1) from sdb_datamining." + self.modelo + '_feature_importance')
-            model_cvresults.write.mode('append').format('parquet').saveAsTable('sdb_datamining.' + self.modelo + '_feature_importance')
+            a = self.spark.sql("select count(1) from " + self.ambiente + '.tmp_challenger_' + self.modelo + '_feature_importance')
+            model_cvresults.write.mode('append').format(self.formato).saveAsTable(self.ambiente + '.tmp_challenger_' + self.modelo + '_feature_importance')
         except:
-            model_cvresults.write.mode('overwrite').format('parquet').saveAsTable('sdb_datamining.' + self.modelo + '_feature_importance')
+            model_cvresults.write.mode('overwrite').format(self.formato).saveAsTable(self.ambiente + '.tmp_challenger_' + self.modelo + '_feature_importance')
         
         
         ###############################################
@@ -857,9 +942,10 @@ class Challenger():
         
         y_pred = clf_final_train.predict(X_test[numerical_cols])
         
+        print("""
         ##############################################
         # ROC
-        
+        """)
 
         
         a = pd.DataFrame(X_test[[target_column, self.CAMPO_CLAVE]], columns=['TGT', self.CAMPO_CLAVE])
@@ -903,22 +989,73 @@ class Challenger():
         # Cambiar esto con la tabla original
         
         try:
-            a = self.spark.sql("select count(1) from sdb_datamining." + self.modelo + '_metricas')
-            model_cvresults.write.mode('append').format('parquet').saveAsTable('sdb_datamining.' + self.modelo + '_metricas')
+            a = self.spark.sql("select count(1) from " + self.ambiente + '.tmp_challenger_' + self.modelo + '_metricas')
+            model_cvresults.write.mode('append').format(self.formato).saveAsTable(self.ambiente + '.tmp_challenger_' + self.modelo + '_metricas')
         except:
-            model_cvresults.write.mode('overwrite').format('parquet').saveAsTable('sdb_datamining.' + self.modelo + '_metricas')
+            model_cvresults.write.mode('overwrite').format(self.formato).saveAsTable(self.ambiente + '.tmp_challenger_' + self.modelo + '_metricas')
         
         
-        
+        print("""
         ###############################################
         # Sacar para grabar
-        
+        """)
     
         ### Save model
         # Seleccionamos el mejor modelo y lo guardamos para compararlo con el otros modelos para luego elegir el modelo ganador
         if self.GRABAR_BINARIOS:
-            scaler.write().overwrite().save(self.PATH + '/' + BINARIO + "_scaler.bin")
-            clf_final_train.write().overwrite().save(self.PATH + '/' + BINARIO + "_model.bin")        
+
+            # Checks if folder exists, otherwise, it is created.
+            exists = os.path.exists(self.TMP_PATH) 
+            if not exists:
+                os.makedirs(self.TMP_PATH)
+
+            # Crear carpeta HDFS
+            os.popen(f'hadoop fs -mkdir -p {self.PATH}')
+            
+
+            assert BINARIO
+            scaler_filename = BINARIO + "_scaler.bin"
+            model_filename = BINARIO + "_model.bin"
+
+            ## Save scaler
+            # Save tmp file in local
+            tmp_path_scaler = os.path.join(self.TMP_PATH, scaler_filename)
+            pickle.dump(scaler, open( tmp_path_scaler, 'wb'))
+            print(f"Guardado el archivo temporal a {tmp_path_scaler}")
+            # Copy tmp file to hdfs
+            path_scaler = os.path.join(self.PATH, scaler_filename)
+            hdfsput = Popen(["hdfs", "dfs", "-copyFromLocal", "-f", 
+                            tmp_path_scaler, 
+                            path_scaler], 
+                            stdin=PIPE, bufsize=-1)
+            hdfsput.communicate()
+            print(f"Copiado el archivo a {path_scaler}")
+            # Delete tmp file
+            if os.path.exists(tmp_path_scaler):
+                os.remove(tmp_path_scaler)
+            
+
+            ## Save model
+            # Save tmp file in local
+            tmp_path_model = os.path.join(self.TMP_PATH, model_filename)
+            pickle.dump(clf_final_train, open(tmp_path_model, 'wb'))
+            print(f"Guardado el archivo temporal en {tmp_path_model}")
+            # Copy tmp file to hdfs
+            path_model = os.path.join(self.PATH, model_filename)
+            hdfsput = Popen(["hdfs", "dfs", "-copyFromLocal", "-f", 
+                            tmp_path_model, 
+                            path_model], 
+                            stdin=PIPE, bufsize=-1)
+            hdfsput.communicate()
+            print(f"Copiado el archivo a {path_model}")    
+            # Delete tmp file
+            if os.path.exists(tmp_path_scaler):
+                os.remove(tmp_path_scaler)
+
+
+            # Dar permisos
+            os.popen(f"hadoop dfs -chmod -R 770 {self.PATH_MODELO}")
+
 
         try:
             
@@ -927,7 +1064,7 @@ class Challenger():
             print('Error Calcular Deciles')
         return scaler, clf_final_train
 
-    def TestingModeloPython(self, pALGORITHM, testing_df, pScaler_train, pModel_train, Nombre_Modelo ):
+    def TestingModeloPython(self, pALGORITHM, testing_df, pScaler_train, pModel_train, Nombre_Modelo, periodo_testing ):
     
     #pALGORITHM = 'XGB'
     #pScaler_train = XGB_scaler_train
@@ -939,16 +1076,15 @@ class Challenger():
 
         # Leo las variables de entrada al self.modelo
         
-        names_df = self.spark.sql("select * from sdb_datamining." + self.modelo + "_variables where  variable not in ( 'label' , '" + self.CAMPO_CLAVE + "')  order by variable  ")
+        names_df = self.spark.sql("select * from " + self.ambiente + '.tmp_challenger_' + self.modelo + "_variables where  variable not in ( 'label' , '" + self.CAMPO_CLAVE + "')  order by variable  ")
         names = list(names_df.toPandas()['variable'])
 
         
-        
-        
         ###################################################
         
-        X_test = testing_df.select(*names).toPandas()
+        X_test_total = testing_df.toPandas()
         
+        X_test = X_test[names]
         
         print(X_test.shape)
         
@@ -975,9 +1111,10 @@ class Challenger():
         probabilities       = pModel_train.predict_proba(X_test[names])
         y_pred              = pModel_train.predict(X_test[names])
 
+        print("""
         ##############################################
         # ROC
-        
+        """)
         
         a = pd.DataFrame(y_test[['label']], columns=['label'])
         a = a.reset_index()
@@ -1007,7 +1144,44 @@ class Challenger():
         model_cvresults = model_cvresults.withColumn("bin", F.lit(BINARIO))
         model_cvresults = model_cvresults.select("algorithm", "metric_desc", "metric_value", "periodo", "bin")
 
-        model_cvresults.write.mode('append').format('parquet').saveAsTable('sdb_datamining.' + self.modelo + '_metricas')
+        model_cvresults.write.mode('append').format(self.formato).saveAsTable(self.ambiente + '.tmp_challenger_' + self.modelo + '_metricas')
+        
+        
+        print("""
+        ###################################################
+        # Grabo Predicciones
+        """)
+        
+        yScore = result['Prob1'].round(4)
+        
+        names += [self.CAMPO_CLAVE]
+        
+        X_test = testing_df.select(*names).toPandas()[self.CAMPO_CLAVE]
+        
+        df_values_lst = pd.concat([X_test, yScore], axis=1).reset_index().drop('index', axis=1)
+        
+        df_values_lst.rename(columns = {'Prob1' : 'prob_1'}, inplace=True)
+        
+        SMALL_ALGO = Nombre_Modelo.lower()
+        BINARIO = f"{self.PERIODO}_challenger_{SMALL_ALGO}"
+        
+        model_cvresults = self.spark.createDataFrame(df_values_lst )
+        
+        model_cvresults = model_cvresults.withColumn("bin", F.lit(BINARIO))\
+                                        .withColumn("periodo", F.lit(self.PERIODO))\
+                                        .withColumn("algorithm", F.lit(Nombre_Modelo))\
+                                        .withColumn("periodo_testing", F.lit(periodo_testing))
+        
+        
+        try:
+            a = self.spark.sql("select count(1) from " + self.ambiente + '.tmp_challenger_' + self.modelo + '_predicciones')
+            model_cvresults.write.mode('append').format(self.formato).saveAsTable(self.ambiente + '.tmp_challenger_' + self.modelo + '_predicciones')
+            
+        except:
+            model_cvresults.write.mode('overwrite').format(self.formato).saveAsTable(self.ambiente + '.tmp_challenger_' + self.modelo + '_predicciones')
+            
+        
+        
         
     def CalcularDeciles(self, pTrain, pTest):
         
@@ -1069,28 +1243,33 @@ class Challenger():
         print("Crear Tablas:-", ct)
         self.BorrarTablasTemporales()
 
+        print("""INFORMACION DE SEGUIMIENTO:
         ####################################################################
         # 1. Crear tabla para Training
         # 1.1. Leer ABT + TGT
         ####################################################################
-        
-        
+        """)
+              
         pABT    =   " SELECT a." + self.CAMPO_CLAVE + ", " + self.ABT_VARIABLES + " , coalesce(" + self.TGT_VARIABLES + """, 0) as label   
                     FROM """ + self.ABT_TABLA +  """ a """ +  """ 
                             left join """ + self.TGT_TABLA + " b  on a." + self.CAMPO_CLAVE + " = b." + self.CAMPO_CLAVE + """
                                                             AND a.periodo = b.periodo 
                     WHERE   a.periodo IN (""" + str(self.PERIODO_TRAIN1) + " , " +  str(self.PERIODO_TRAIN2)  + " , " +str( self.PERIODO_TRAIN3)  + " , " + str(self.PERIODO_TRAIN4)  + " , " + str(self.PERIODO_TRAIN5)  + " , " + str(self.PERIODO_TRAIN6) + ")"
+                    
+        print(pABT)
         
         # cargamos las variables de la abt que se uso en el modelo productivo y el target con los periodos de training para realizar el entrenamiento 
         train_undersampled_df = self.spark.sql(pABT).na.fill(-999)
         
-        train_undersampled_df.write.mode('overwrite').format('parquet').saveAsTable('sdb_datamining.' + self.modelo + '_0')
+        train_undersampled_df.write.mode('overwrite').format(self.formato).saveAsTable(self.ambiente + '.tmp_challenger_' + self.modelo + '_0')
         
+        print("""INFORMACION DE SEGUIMIENTO:
         ####################################################################
         # 1.2. Balanceo y Particiones
         ####################################################################
-        
-        train_undersampled_df = self.spark.sql("select * from sdb_datamining." +  self.modelo + '_0')
+        """)
+
+        train_undersampled_df = self.spark.sql("select * from " + self.ambiente + '.tmp_challenger_' +  self.modelo + '_0')
         print('TABLA ORIGINAL: ', train_undersampled_df.count())
         
         if self.BALANCEAR_TARGET  == True:
@@ -1099,13 +1278,15 @@ class Challenger():
         train_undersampled_df = self.ControlParticiones(train_undersampled_df, self.CAMPO_CLAVE, self.REGISTROS_X_PARTICION) 
         
         
-        train_undersampled_df.write.mode('overwrite').format('parquet').saveAsTable('sdb_datamining.' + self.modelo + '_1')
+        train_undersampled_df.write.mode('overwrite').format(self.formato).saveAsTable(self.ambiente + '.tmp_challenger_' + self.modelo + '_1')
         
+        print("""INFORMACION DE SEGUIMIENTO:
         ####################################################################
         # 1.3. Corregir Numeros, Eliminar Correlaciones y Particiones
         ####################################################################
-        
-        train_undersampled_df = self.spark.sql("select * from sdb_datamining." +  self.modelo + '_1')
+        """)
+
+        train_undersampled_df = self.spark.sql("select * from " + self.ambiente + '.tmp_challenger_' +  self.modelo + '_1')
         
         train_undersampled_df = self.DecimalToDouble(train_undersampled_df)
         if self.CASTEAR_BIGINT == True: 
@@ -1119,12 +1300,14 @@ class Challenger():
         
         
         train_undersampled_df = self.ControlParticiones(train_undersampled_df, self.CAMPO_CLAVE, self.REGISTROS_X_PARTICION) 
-        train_undersampled_df.write.mode('overwrite').format('parquet').saveAsTable('sdb_datamining.' +  self.modelo + '_2' )
+        train_undersampled_df.write.mode('overwrite').format(self.formato).saveAsTable(self.ambiente + '.tmp_challenger_' + self.modelo + '_2' )
 
+        print("""INFORMACION DE SEGUIMIENTO:
         ####################################################################
         # 1.4. Grabo las variables que van a entrar al modelo
         ####################################################################
-        
+        """)
+
         # Grabar las variables.....
         columns = ['variable']
         
@@ -1136,12 +1319,14 @@ class Challenger():
                 ["variable"]  
             )
             
-        variable.write.mode('overwrite').format('parquet').saveAsTable('sdb_datamining.' + self.modelo + '_variables' )
+        variable.write.mode('overwrite').format(self.formato).saveAsTable(self.ambiente + '.tmp_challenger_' + self.modelo + '_variables' )
 
+        print("""INFORMACION DE SEGUIMIENTO:
         ####################################################################
         ## 2. Cargar ABT de Testing
         ####################################################################
-        
+        """)
+
         if self.TIENE_TESTING == True:
             
             pABT    =   " SELECT a.periodo , a." + self.CAMPO_CLAVE + ", " + self.ABT_VARIABLES + " , coalesce(" + self.TGT_VARIABLES + """, 0) as label   
@@ -1167,166 +1352,211 @@ class Challenger():
             
             
             train_undersampled_df = self.ControlParticiones(train_undersampled_df, self.CAMPO_CLAVE, self.REGISTROS_X_PARTICION)
-            test_undersampled_df.write.mode('overwrite').format('parquet').saveAsTable('sdb_datamining.' +  self.modelo + '_testing' )
+            test_undersampled_df.write.mode('overwrite').format(self.formato).saveAsTable(self.ambiente + '.tmp_challenger_' + self.modelo + '_testing' )
         
         
+    
+    def LeerTablas(self):
+
+        print("""INFORMACION DE SEGUIMIENTO:
+        #############################################################################    
+        # 3. Entreno el Modelo        
+        #############################################################################
+        """)
+
+        train_undersampled_df = self.spark.sql("select * from " + self.ambiente + '.tmp_challenger_' + self.modelo + '_2')
+        
+        if self.TIENE_TESTING == True:
+            testing_df_m1 = self.spark.sql("select * from " + self.ambiente + '.tmp_challenger_' + self.modelo + '_testing where periodo = ' + str(self.PERIODO_TEST1) )
+            testing_df_m2 = self.spark.sql("select * from " + self.ambiente + '.tmp_challenger_' + self.modelo + '_testing where periodo = ' + str(self.PERIODO_TEST2) )
+            testing_df_m3 = self.spark.sql("select * from " + self.ambiente + '.tmp_challenger_' + self.modelo + '_testing where periodo = ' + str(self.PERIODO_TEST3) )
+
+        return train_undersampled_df, testing_df_m1, testing_df_m2, testing_df_m3
+
+
+
+    def RandomForest(self, Corrida, train_undersampled_df, testing_df_m1, testing_df_m2, testing_df_m3):        
+        
+        print ('*'*30)
+        print (' RANDOM FOREST ')
+        Nombre_Modelo = 'RF_' + str(Corrida)
+        RF_Model_train = self.EntrenarModeloSpark('RF', train_undersampled_df, self.PORCENTAJE_TRAINING, self.RF_param_test, Nombre_Modelo  ) 
+        
+        if self.TIENE_TESTING == True:        
+            print( 'Testing ')
+            self.TestingModeloSpark('RF', testing_df_m1, RF_Model_train, Nombre_Modelo + ' TESTING MES1', self.PERIODO_TEST1)
+            self.TestingModeloSpark('RF', testing_df_m2, RF_Model_train, Nombre_Modelo + ' TESTING MES2', self.PERIODO_TEST2)
+            self.TestingModeloSpark('RF', testing_df_m3, RF_Model_train, Nombre_Modelo + ' TESTING MES3', self.PERIODO_TEST3)
+         
+
+
+    def GradientBoosting(self, Corrida, train_undersampled_df, testing_df_m1, testing_df_m2, testing_df_m3):
+
+        print ('*'*30)
+        print (' GRADIENT BOOSTING ')
+
+        Nombre_Modelo = 'GB_' + str(Corrida)             
+        GB_Model_train = self.EntrenarModeloSpark('GB', train_undersampled_df, self.PORCENTAJE_TRAINING, self.GB_param_test, Nombre_Modelo) 
+        
+        if self.TIENE_TESTING == True:        
+            print( 'Testing ')
+            self.TestingModeloSpark('GB', testing_df_m1, GB_Model_train, Nombre_Modelo + ' TESTING MES1', self.PERIODO_TEST1)
+            self.TestingModeloSpark('GB', testing_df_m2, GB_Model_train, Nombre_Modelo + ' TESTING MES2', self.PERIODO_TEST2)
+            self.TestingModeloSpark('GB', testing_df_m3, GB_Model_train, Nombre_Modelo + ' TESTING MES3', self.PERIODO_TEST3)
+         
+
+
+    def LIGHTGBMPandas(self, Corrida, train_undersampled_df, testing_df_m1, testing_df_m2, testing_df_m3):
+                        
+        print ('*'*30)
+        print (' LIGHTGBM ')
+        
+        Nombre_Modelo = 'LGBM_' + str(Corrida)
+        LGBM_scaler_train, LGBM_model_train = self.EntrenarModeloPandas('LGBM', train_undersampled_df, self.PORCENTAJE_TRAINING, self.LGBM_param_test, Nombre_Modelo)
+        
+        if self.TIENE_TESTING == True:        
+            print( 'Testing ')
+            self.TestingModeloPython('LGBM', testing_df_m1, LGBM_scaler_train, LGBM_model_train, Nombre_Modelo + ' TESTING MES1', self.PERIODO_TEST1)
+            self.TestingModeloPython('LGBM', testing_df_m2, LGBM_scaler_train, LGBM_model_train, Nombre_Modelo + ' TESTING MES2', self.PERIODO_TEST2)
+            self.TestingModeloPython('LGBM', testing_df_m3, LGBM_scaler_train, LGBM_model_train, Nombre_Modelo + ' TESTING MES3', self.PERIODO_TEST3)
+          
+
+    def XGBoostPandas(self, Corrida, train_undersampled_df, testing_df_m1, testing_df_m2, testing_df_m3):
+        
+        print ('*'*30)
+        print (' XGB ')
+        
+        Nombre_Modelo = 'XGB_' + str(Corrida)
+        XGB_scaler_train, XGB_model_train = self.EntrenarModeloPandas('XGB', train_undersampled_df, self.PORCENTAJE_TRAINING, self.XGB_param_test, Nombre_Modelo)
+        
+        if self.TIENE_TESTING == True:        
+            print( 'Testing ')
+            self.TestingModeloPython('XGB', testing_df_m1, XGB_scaler_train, XGB_model_train, Nombre_Modelo + ' TESTING MES1', self.PERIODO_TEST1)
+            self.TestingModeloPython('XGB', testing_df_m2, XGB_scaler_train, XGB_model_train, Nombre_Modelo + ' TESTING MES2', self.PERIODO_TEST2)
+            self.TestingModeloPython('XGB', testing_df_m3, XGB_scaler_train, XGB_model_train, Nombre_Modelo + ' TESTING MES3', self.PERIODO_TEST3)
+                    
+
+
+    def ModeloProductivo(self, Corrida, train_undersampled_df, testing_df_m1, testing_df_m2, testing_df_m3):
+        
+        print ('*'*30)
+        print (' MODELO PRODUCTIVO ')
+        
+        if self.MODELO_PRODUCTIVO == 'RF':
+        
+            Nombre_Modelo = 'RF_PRODUCTIVO' + str(Corrida)           
+            Productivo_Model_train = self.EntrenarModeloSpark('RF', train_undersampled_df, self.PORCENTAJE_TRAINING, self.MODELO_PRODUCTIVO_param_test, Nombre_Modelo) 
+        
+        elif self.MODELO_PRODUCTIVO == 'GB':
+            
+            Nombre_Modelo = 'GB_PRODUCTIVO'   + str(Corrida)                      
+            Productivo_Model_train = self.EntrenarModeloSpark('GB', train_undersampled_df, self.PORCENTAJE_TRAINING, self.MODELO_PRODUCTIVO_param_test, Nombre_Modelo) 
+        
+        elif self.MODELO_PRODUCTIVO == 'LGBM':
+                
+            Nombre_Modelo = 'LGBM_PRODUCTIVO' + str(Corrida)           
+            Productivo_scaler_train, Productivo__model_train = self.EntrenarModeloPandas('LGBM', train_undersampled_df, self.PORCENTAJE_TRAINING, self.MODELO_PRODUCTIVO_param_test, Nombre_Modelo)
+            
+        elif self.MODELO_PRODUCTIVO == 'XGB':
+                
+            Nombre_Modelo = 'XGB_PRODUCTIVO' + str(Corrida)           
+            Productivo_scaler_train, Productivo__model_train, XGB_trainingData_Score, XGB_testingData_Score = self.EntrenarModeloPandas('XGB', train_undersampled_df, self.PORCENTAJE_TRAINING, self.MODELO_PRODUCTIVO_param_test, Nombre_Modelo)
+            
+            self.CalcularDeciles(XGB_trainingData_Score, XGB_testingData_Score)
+            
+        if self.TIENE_TESTING == True:        
+            print( 'Testing ')
+            if self.MODELO_PRODUCTIVO == 'RF' or self.MODELO_PRODUCTIVO == 'GB':
+                
+                self.TestingModeloSpark(self.MODELO_PRODUCTIVO, testing_df_m1, Productivo_Model_train, Nombre_Modelo + ' TESTING MES1', self.PERIODO_TEST1)
+                self.TestingModeloSpark(self.MODELO_PRODUCTIVO, testing_df_m2, Productivo_Model_train, Nombre_Modelo + ' TESTING MES2', self.PERIODO_TEST2)
+                self.TestingModeloSpark(self.MODELO_PRODUCTIVO, testing_df_m3, Productivo_Model_train, Nombre_Modelo + ' TESTING MES3', self.PERIODO_TEST3)
+                    
+            elif self.MODELO_PRODUCTIVO == 'XGB' or self.MODELO_PRODUCTIVO == 'LGBM':
+                self.TestingModeloPython(self.MODELO_PRODUCTIVO, testing_df_m1, Productivo_scaler_train, Productivo__model_train, Nombre_Modelo + ' TESTING MES1', self.PERIODO_TEST1)
+                self.TestingModeloPython(self.MODELO_PRODUCTIVO, testing_df_m2, Productivo_scaler_train, Productivo__model_train, Nombre_Modelo + ' TESTING MES2', self.PERIODO_TEST2)
+                self.TestingModeloPython(self.MODELO_PRODUCTIVO, testing_df_m3, Productivo_scaler_train, Productivo__model_train, Nombre_Modelo + ' TESTING MES3', self.PERIODO_TEST3)
+        
+
+    def MejoresVariables(self):
+        print("""
+        #############################################################################    
+        # 4. Mejores Variables de Todos los modelos
+        #############################################################################
+        """)
+
+        a = self.spark.sql("""select variable, sum(rownum ) as rownum 
+                        from (select ROW_NUMBER() OVER(PARTITION BY algorithm ORDER BY importance DESC) AS rownum, * 
+                                from """ + self.ambiente + '.tmp_challenger_' + self.modelo + """_feature_importance) 
+                        group by variable
+                        order by 2 """)
+                    
+        a.write.mode('overwrite').format(self.formato).saveAsTable(self.ambiente + '.tmp_challenger_' + self.modelo + '_feature_importance_rank')
+
+
+
     def EntrenarModelos(self, Corrida):
         ct = datetime.datetime.now()
 
         print("Entrenamiento:-", ct)
-        
-        train_undersampled_df = self.spark.sql("select * from sdb_datamining." +  self.modelo  + '_2')
-        
-        if self.TIENE_TESTING == True:
-            testing_df_m1 = self.spark.sql("select * from sdb_datamining." +  self.modelo + '_testing where periodo = ' + str(self.PERIODO_TEST1) )
-            testing_df_m2 = self.spark.sql("select * from sdb_datamining." +  self.modelo + '_testing where periodo = ' + str(self.PERIODO_TEST2) )
-            testing_df_m3 = self.spark.sql("select * from sdb_datamining." +  self.modelo + '_testing where periodo = ' + str(self.PERIODO_TEST3) )
+    
+        train_undersampled_df, testing_df_m1, testing_df_m2, testing_df_m3 = self.LeerTablas()
 
 
-        #############################################################################    
-        # 3. Entreno el Modelo        
-        #############################################################################
-        
         # 3.1. Random Forest
-                
         try:
             if self.CORRER_RF == True:
-                print ('*'*30)
-                print (' RANDOM FOREST ')
-                Nombre_Modelo = 'RF_' + str(Corrida)
-                RF_Model_train = self.EntrenarModeloSpark('RF', train_undersampled_df, self.PORCENTAJE_TRAINING, self.RF_param_test, Nombre_Modelo  ) 
-                
-                if self.TIENE_TESTING == True:        
-                    print( 'Testing ')
-                    self.TestingModeloSpark('RF', testing_df_m1, RF_Model_train, Nombre_Modelo + ' TESTING MES1')
-                    self.TestingModeloSpark('RF', testing_df_m2, RF_Model_train, Nombre_Modelo + ' TESTING MES2')
-                    self.TestingModeloSpark('RF', testing_df_m3, RF_Model_train, Nombre_Modelo + ' TESTING MES3')
+                self.RandomForest(Corrida, train_undersampled_df, testing_df_m1, testing_df_m2, testing_df_m3)
         except:
-            print('Error Random Forest')
-            
-            
+            print('Error Random Forest') 
+
+
         # 3.2. Gradient Boosting 
         try:
             if self.CORRER_GB  == True:
-                print ('*'*30)
-                print (' GRADIENT BOOSTING ')
-        
-                Nombre_Modelo = 'GB_' + str(Corrida)             
-                GB_Model_train = self.EntrenarModeloSpark('GB', train_undersampled_df, self.PORCENTAJE_TRAINING, self.GB_param_test, Nombre_Modelo) 
-                
-                if self.TIENE_TESTING == True:        
-                    print( 'Testing ')
-                    self.TestingModeloSpark('GB', testing_df_m1, GB_Model_train, Nombre_Modelo + ' TESTING MES1')
-                    self.TestingModeloSpark('GB', testing_df_m2, GB_Model_train, Nombre_Modelo + ' TESTING MES2')
-                    self.TestingModeloSpark('GB', testing_df_m3, GB_Model_train, Nombre_Modelo + ' TESTING MES3')
+                self.GradientBoosting(Corrida, train_undersampled_df, testing_df_m1, testing_df_m2, testing_df_m3)
         except:
-            print('Error Gradient Boosting')
+            print('Error Gradient Boosting')         
         
         
         ## 3.3. LIGHTGBM Pandas
         try:    
             if self.CORRER_LGBM  == True:
-                
-                print ('*'*30)
-                print (' LIGHTGBM ')
-                
-                Nombre_Modelo = 'LGBM_' + str(Corrida)
-                LGBM_scaler_train, LGBM_model_train = self.EntrenarModeloPandas('LGBM', train_undersampled_df, self.PORCENTAJE_TRAINING, self.LGBM_param_test, Nombre_Modelo)
-                
-                if self.TIENE_TESTING == True:        
-                    print( 'Testing ')
-                    self.TestingModeloPython('LGBM', testing_df_m1, LGBM_scaler_train, LGBM_model_train, Nombre_Modelo + ' TESTING MES1')
-                    self.TestingModeloPython('LGBM', testing_df_m2, LGBM_scaler_train, LGBM_model_train, Nombre_Modelo + ' TESTING MES2')
-                    self.TestingModeloPython('LGBM', testing_df_m3, LGBM_scaler_train, LGBM_model_train, Nombre_Modelo + ' TESTING MES3')
+                self.LIGHTGBMPandas(Corrida, train_undersampled_df, testing_df_m1, testing_df_m2, testing_df_m3)
         except:
-            print('Error Lightgbm')
-        
-        
+            print('Error Lightgbm') 
+    
+
+        # 3.4. XGBoost Pandas
         try:
-            # 3.4. XGBoost Pandas
             if self.CORRER_XGB == True:
-                print ('*'*30)
-                print (' XGB ')
-                
-                Nombre_Modelo = 'XGB_' + str(Corrida)
-                XGB_scaler_train, XGB_model_train = self.EntrenarModeloPandas('XGB', train_undersampled_df, self.PORCENTAJE_TRAINING, self.XGB_param_test, Nombre_Modelo)
-                
-                if self.TIENE_TESTING == True:        
-                    print( 'Testing ')
-                    self.TestingModeloPython('XGB', testing_df_m1, XGB_scaler_train, XGB_model_train, Nombre_Modelo + ' TESTING MES1')
-                    self.TestingModeloPython('XGB', testing_df_m2, XGB_scaler_train, XGB_model_train, Nombre_Modelo + ' TESTING MES2')
-                    self.TestingModeloPython('XGB', testing_df_m3, XGB_scaler_train, XGB_model_train, Nombre_Modelo + ' TESTING MES3')
-            
+                self.XGBoostPandas(Corrida, train_undersampled_df, testing_df_m1, testing_df_m2, testing_df_m3)
         except:
             print('Error XGBoost')
             
-        try:
-                
-            # 3.5. Modelo Productivo
-            
+
+        # 3.5. Modelo Productivo
+        try:            
             if self.CORRER_PRODUCTIVO == True:
-                print ('*'*30)
-                print (' MODELO PRODUCTIVO ')
-                
-                if self.MODELO_PRODUCTIVO == 'RF':
-                
-                    Nombre_Modelo = 'RF_PRODUCTIVO' + str(Corrida)           
-                    Productivo_Model_train = self.EntrenarModeloSpark('RF', train_undersampled_df, self.PORCENTAJE_TRAINING, self.MODELO_PRODUCTIVO_param_test, Nombre_Modelo) 
-                
-                elif self.MODELO_PRODUCTIVO == 'GB':
-                    
-                    Nombre_Modelo = 'GB_PRODUCTIVO'   + str(Corrida)                      
-                    Productivo_Model_train = self.EntrenarModeloSpark('GB', train_undersampled_df, self.PORCENTAJE_TRAINING, self.MODELO_PRODUCTIVO_param_test, Nombre_Modelo) 
-                
-                elif self.MODELO_PRODUCTIVO == 'LGBM':
-                        
-                    Nombre_Modelo = 'LGBM_PRODUCTIVO' + str(Corrida)           
-                    Productivo_scaler_train, Productivo__model_train = self.EntrenarModeloPandas('LGBM', train_undersampled_df, self.PORCENTAJE_TRAINING, self.MODELO_PRODUCTIVO_param_test, Nombre_Modelo)
-                    
-                elif self.MODELO_PRODUCTIVO == 'XGB':
-                        
-                    Nombre_Modelo = 'XGB_PRODUCTIVO' + str(Corrida)           
-                    Productivo_scaler_train, Productivo__model_train, XGB_trainingData_Score, XGB_testingData_Score = self.EntrenarModeloPandas('XGB', train_undersampled_df, self.PORCENTAJE_TRAINING, self.MODELO_PRODUCTIVO_param_test, Nombre_Modelo)
-                    
-                    self.CalcularDeciles(XGB_trainingData_Score, XGB_testingData_Score)
-                    
-                if self.TIENE_TESTING == True:        
-                    print( 'Testing ')
-                    if self.MODELO_PRODUCTIVO == 'RF' or self.MODELO_PRODUCTIVO == 'GB':
-                        
-                        self.TestingModeloSpark(self.MODELO_PRODUCTIVO, testing_df_m1, Productivo_Model_train, Nombre_Modelo + ' TESTING MES1')
-                        self.TestingModeloSpark(self.MODELO_PRODUCTIVO, testing_df_m2, Productivo_Model_train, Nombre_Modelo + ' TESTING MES2')
-                        self.TestingModeloSpark(self.MODELO_PRODUCTIVO, testing_df_m3, Productivo_Model_train, Nombre_Modelo + ' TESTING MES3')
-                            
-                    elif self.MODELO_PRODUCTIVO == 'XGB' or self.MODELO_PRODUCTIVO == 'LGBM':
-                        self.TestingModeloPython(self.MODELO_PRODUCTIVO, testing_df_m1, Productivo_scaler_train, Productivo__model_train, Nombre_Modelo + ' TESTING MES1')
-                        self.TestingModeloPython(self.MODELO_PRODUCTIVO, testing_df_m2, Productivo_scaler_train, Productivo__model_train, Nombre_Modelo + ' TESTING MES2')
-                        self.TestingModeloPython(self.MODELO_PRODUCTIVO, testing_df_m3, Productivo_scaler_train, Productivo__model_train, Nombre_Modelo + ' TESTING MES3')
+                self.ModeloProductivo(Corrida, train_undersampled_df, testing_df_m1, testing_df_m2, testing_df_m3)
         except:
             print('Error Modelo Productivo ')
         
+
         ct = datetime.datetime.now()
         print("Entrenamiento Fin:-", ct)
+
+        self.MejoresVariables()    
         
-        
-        #############################################################################    
-        # 4. Mejores Variables de Todos los modelos
-        #############################################################################
-        
-        a = self.spark.sql("""select variable, sum(rownum ) as rownum 
-                        from (select ROW_NUMBER() OVER(PARTITION BY algorithm ORDER BY importance DESC) AS rownum, * 
-                                from sdb_datamining.""" + self.modelo + """_feature_importance) 
-                        group by variable
-                        order by 2 """)
-                    
-        a.write.mode('overwrite').format('parquet').saveAsTable('sdb_datamining.' + self.modelo + '_feature_importance_rank')
         
 
     def MejorModeloEntrenado(self, ):
+        print("""
         #############################################################################    
         # 5. Elijo el Mejor modelo entrenado
         #############################################################################
-            
+        """)
+
         # Busco quien es el mejor en Testing
         
         meses_testing = self.spark.sql("""
@@ -1336,29 +1566,29 @@ class Challenger():
                         + case when mes3.ALGORITHM = a.ALGORITHM then 1 else 0 end ) as meses_ganadores
                         
                         
-            FROM sdb_datamining.""" + self.modelo + """_metricas  A
+            FROM """ + self.ambiente + '.tmp_challenger_' + self.modelo +  """_metricas  A
                 left join (SELECT MAX(ALGORITHM)  AS ALGORITHM /* PONGO UN MAX POR SI EMPATAN QUE SE QUEDE CON UNO */
-                            FROM sdb_datamining.""" + self.modelo + """_metricas  A,
+                            FROM """ + self.ambiente + '.tmp_challenger_' + self.modelo +  """_metricas  A,
                                     (select  max(metric_value) AS metric_value
-                                    from sdb_datamining.""" + self.modelo + """_metricas 
+                                    from """ + self.ambiente + '.tmp_challenger_' + self.modelo +  """_metricas 
                                     where algorithm like '% TESTING MES1'
                                     AND   metric_desc = 'AUC_TESTEO' ) B
                             WHERE   A.metric_value = B.metric_value
                                     ) mes1  on a.ALGORITHM = mes1.ALGORITHM 
                 
                 left join (SELECT MAX(ALGORITHM)  AS ALGORITHM /* PONGO UN MAX POR SI EMPATAN QUE SE QUEDE CON UNO */
-                            FROM sdb_datamining.""" + self.modelo + """_metricas  A,
+                            FROM """ + self.ambiente + '.tmp_challenger_' + self.modelo +  """_metricas  A,
                                     (select  max(metric_value) AS metric_value
-                                    from sdb_datamining.""" + self.modelo + """_metricas 
+                                    from """ + self.ambiente + '.tmp_challenger_' + self.modelo +  """_metricas 
                                     where algorithm like '% TESTING MES2'
                                     AND   metric_desc = 'AUC_TESTEO' ) B
                             WHERE   A.metric_value = B.metric_value
                                     ) mes2  on a.ALGORITHM = mes2.ALGORITHM 
                             
                 left join (SELECT MAX(ALGORITHM)  AS ALGORITHM /* PONGO UN MAX POR SI EMPATAN QUE SE QUEDE CON UNO */
-                            FROM sdb_datamining.""" + self.modelo + """_metricas  A,
+                            FROM """ + self.ambiente + '.tmp_challenger_' + self.modelo +  """_metricas  A,
                                     (select  max(metric_value) AS metric_value
-                                    from sdb_datamining.""" + self.modelo + """_metricas 
+                                    from """ + self.ambiente + '.tmp_challenger_' + self.modelo +  """_metricas 
                                     where algorithm like '% TESTING MES3'
                                     AND   metric_desc = 'AUC_TESTEO' ) B
                             WHERE   A.metric_value = B.metric_value
@@ -1376,7 +1606,7 @@ class Challenger():
         
         modelo_ganador_testing = self.spark.sql("""
             select  a.*
-            FROM sdb_datamining.""" + self.modelo + """_metricas  A,
+            FROM """ + self.ambiente + '.tmp_challenger_' + self.modelo +  """_metricas  A,
                         (SELECT MAX(ALGORITHM) AS ALGORITHM
                         FROM 
                             (select replace(replace(replace(A.ALGORITHM, 'MES1', ''), 'MES2', ''), 'MES3', '') AS ALGORITHM
@@ -1421,6 +1651,32 @@ class Challenger():
             """).toPandas()['MESES_GANADORES'][0]
             
         print('MESES QUE EL NUEVO MODELO LE GANA AL PRODUCTIVO: ', meses_ganadores_vs_produccion)
+
+
+        prod_vs_chall = self.spark.sql("""
+            SELECT  A.*,
+                        B.metric_value as auc_testing, B.metric_value - A.AUC_PROD as diff,
+                        CASE WHEN B.metric_value - A.AUC_PROD > 0.02 THEN 1 ELSE 0 END AS MESES_GANADORES
+                from 
+                        (SELECT  
+                                
+                                substr(cast(fecha AS STRING),1,6) AS periodo, 
+                                sum(suma_area) AS auc_prod    
+                        FROM    data_lake_analytics.indicadores_performance  
+                        WHERE   substr(cast(fecha AS STRING),1,6) IN ( """ + str(self.PERIODO_TEST1) + ',' + str(self.PERIODO_TEST2) + ',' + str(self.PERIODO_TEST3) + """)
+                        AND     modelo = '""" + self.modelo + """'
+                        AND     tipo = 'PERFORMANCE'
+                        group by modelo, substr(cast(fecha AS STRING),1,6) ) A
+                        
+                        LEFT JOIN modelo_ganador_testing B ON A.PERIODO = case when b.algorithm like '% TESTING MES1' then """ + str(self.PERIODO_TEST1) + """
+                                                                                when b.algorithm like '% TESTING MES2' then """ + str(self.PERIODO_TEST2) + """
+                                                                                when b.algorithm like '% TESTING MES3' then """ + str(self.PERIODO_TEST3) + """
+                                                                        end
+        """)
+
+        prod_vs_chall.show(10)
+
+        return meses_ganadores_vs_produccion, prod_vs_chall
         
         
     def DecimalToDouble(self, train_undersampled_df):
@@ -1455,4 +1711,3 @@ class Challenger():
         
         ct = datetime.datetime.now()
         print("Challenger Fin:-", ct)
-        
