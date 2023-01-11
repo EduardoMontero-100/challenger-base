@@ -1371,11 +1371,10 @@ class Challenger():
             testing_df_m1 = self.spark.sql("select * from " + self.ambiente + '.tmp_challenger_' + self.modelo + '_testing where periodo = ' + str(self.PERIODO_TEST1) )
             testing_df_m2 = self.spark.sql("select * from " + self.ambiente + '.tmp_challenger_' + self.modelo + '_testing where periodo = ' + str(self.PERIODO_TEST2) )
             testing_df_m3 = self.spark.sql("select * from " + self.ambiente + '.tmp_challenger_' + self.modelo + '_testing where periodo = ' + str(self.PERIODO_TEST3) )
-
-	else:
-		testing_df_m1 = spark.createDataFrame([["periodo"]], ['periodo'])
-		testing_df_m2 = spark.createDataFrame([["periodo"]], ['periodo'])
-		testing_df_m3 = spark.createDataFrame([["periodo"]], ['periodo'])
+        else:
+            testing_df_m1 = self.spark.createDataFrame([["periodo"]], ['periodo'])
+            testing_df_m2 = self.spark.createDataFrame([["periodo"]], ['periodo'])
+            testing_df_m3 = self.spark.createDataFrame([["periodo"]], ['periodo'])
 
 
         return train_undersampled_df, testing_df_m1, testing_df_m2, testing_df_m3
@@ -1571,8 +1570,6 @@ class Challenger():
                     SUM(  case when mes1.ALGORITHM = a.ALGORITHM then 1 else 0 end
                         + case when mes2.ALGORITHM = a.ALGORITHM then 1 else 0 end
                         + case when mes3.ALGORITHM = a.ALGORITHM then 1 else 0 end ) as meses_ganadores
-
-
             FROM """ + self.ambiente + '.tmp_challenger_' + self.modelo +  """_metricas  A
                 left join (SELECT MAX(ALGORITHM)  AS ALGORITHM /* PONGO UN MAX POR SI EMPATAN QUE SE QUEDE CON UNO */
                             FROM """ + self.ambiente + '.tmp_challenger_' + self.modelo +  """_metricas  A,
@@ -1582,7 +1579,6 @@ class Challenger():
                                     AND   metric_desc = 'AUC_TESTEO' ) B
                             WHERE   A.metric_value = B.metric_value
                                     ) mes1  on a.ALGORITHM = mes1.ALGORITHM
-
                 left join (SELECT MAX(ALGORITHM)  AS ALGORITHM /* PONGO UN MAX POR SI EMPATAN QUE SE QUEDE CON UNO */
                             FROM """ + self.ambiente + '.tmp_challenger_' + self.modelo +  """_metricas  A,
                                     (select  max(metric_value) AS metric_value
@@ -1591,7 +1587,6 @@ class Challenger():
                                     AND   metric_desc = 'AUC_TESTEO' ) B
                             WHERE   A.metric_value = B.metric_value
                                     ) mes2  on a.ALGORITHM = mes2.ALGORITHM
-
                 left join (SELECT MAX(ALGORITHM)  AS ALGORITHM /* PONGO UN MAX POR SI EMPATAN QUE SE QUEDE CON UNO */
                             FROM """ + self.ambiente + '.tmp_challenger_' + self.modelo +  """_metricas  A,
                                     (select  max(metric_value) AS metric_value
@@ -1626,7 +1621,6 @@ class Challenger():
                         ) B
                 WHERE A.ALGORITHM LIKE '%TESTING MES%'
                 AND   replace(replace(replace(A.ALGORITHM, 'MES1', ''), 'MES2', ''), 'MES3', '') = B.ALGORITHM
-
             """)
 
         modelo_ganador_testing.show()
@@ -1649,7 +1643,6 @@ class Challenger():
                             AND     modelo = '""" + self.modelo + """'
                             AND     tipo = 'PERFORMANCE'
                             group by modelo, substr(cast(fecha AS STRING),1,6) ) A
-
                             LEFT JOIN modelo_ganador_testing B ON A.PERIODO = case when b.algorithm like '% TESTING MES1' then """ + str(self.PERIODO_TEST1) + """
                                                                                     when b.algorithm like '% TESTING MES2' then """ + str(self.PERIODO_TEST2) + """
                                                                                     when b.algorithm like '% TESTING MES3' then """ + str(self.PERIODO_TEST3) + """
@@ -1666,7 +1659,6 @@ class Challenger():
                         CASE WHEN B.metric_value - A.AUC_PROD > 0.02 THEN 1 ELSE 0 END AS MESES_GANADORES
                 from
                         (SELECT
-
                                 substr(cast(fecha AS STRING),1,6) AS periodo,
                                 sum(suma_area) AS auc_prod
                         FROM    data_lake_analytics.indicadores_performance
@@ -1674,7 +1666,6 @@ class Challenger():
                         AND     modelo = '""" + self.modelo + """'
                         AND     tipo = 'PERFORMANCE'
                         group by modelo, substr(cast(fecha AS STRING),1,6) ) A
-
                         LEFT JOIN modelo_ganador_testing B ON A.PERIODO = case when b.algorithm like '% TESTING MES1' then """ + str(self.PERIODO_TEST1) + """
                                                                                 when b.algorithm like '% TESTING MES2' then """ + str(self.PERIODO_TEST2) + """
                                                                                 when b.algorithm like '% TESTING MES3' then """ + str(self.PERIODO_TEST3) + """
