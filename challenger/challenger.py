@@ -1366,10 +1366,17 @@ class Challenger():
 
         train_undersampled_df = self.spark.sql("select * from " + self.ambiente + '.tmp_challenger_' + self.modelo + '_2')
 
+
         if self.TIENE_TESTING == True:
             testing_df_m1 = self.spark.sql("select * from " + self.ambiente + '.tmp_challenger_' + self.modelo + '_testing where periodo = ' + str(self.PERIODO_TEST1) )
             testing_df_m2 = self.spark.sql("select * from " + self.ambiente + '.tmp_challenger_' + self.modelo + '_testing where periodo = ' + str(self.PERIODO_TEST2) )
             testing_df_m3 = self.spark.sql("select * from " + self.ambiente + '.tmp_challenger_' + self.modelo + '_testing where periodo = ' + str(self.PERIODO_TEST3) )
+
+	else:
+		testing_df_m1 = spark.createDataFrame([["periodo"]], ['periodo'])
+		testing_df_m2 = spark.createDataFrame([["periodo"]], ['periodo'])
+		testing_df_m3 = spark.createDataFrame([["periodo"]], ['periodo'])
+
 
         return train_undersampled_df, testing_df_m1, testing_df_m2, testing_df_m3
 
