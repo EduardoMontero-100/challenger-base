@@ -256,13 +256,11 @@ class Challenger():
         # Numerical vars
         numericCols = [c for c in train_undersampled_df.columns if c not in [self.CAMPO_CLAVE,'periodo', 'origin', 'label']]
         print("Num. numeric vars: " , len(numericCols))
-
-        for c_name, c_type in train_undersampled_df.dtypes:
+        for c_name in numericCols:
             #if c_type in ('double', 'float', 'decimal', 'int', 'smallint'):
             train_undersampled_df = train_undersampled_df.withColumn(c_name, F.round(c_name, pDecimales))
-
+        
         return train_undersampled_df
-
 
 
     def EliminarCorrelaciones(self, train_undersampled_df, pCota):
