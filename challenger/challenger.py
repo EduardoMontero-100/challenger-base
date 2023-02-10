@@ -1707,3 +1707,16 @@ class Challenger():
 
         ct = datetime.datetime.now()
         print("Challenger Fin:-", ct)
+    
+    
+    
+    @classmethod
+    def instanciar_desde_json(cls, json_file):
+        import json
+        with open(json_file) as reader:
+            json_data=json.load(reader)
+        return cls(**json_data)
+    
+    def json_dump(self):
+        import json
+        return json.dumps(self.__dict__)
