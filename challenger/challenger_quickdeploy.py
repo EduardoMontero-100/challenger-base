@@ -218,12 +218,19 @@ class Challenger():
 
     def CastBigInt(self, train_undersampled_df):
 
-        a = pd.DataFrame(train_undersampled_df.drop(self.CAMPO_CLAVE).dtypes)
+
+
+
+        a = pd.DataFrame(train_undersampled_df.dtypes)
         a.columns = ['columna', 'tipo']
 
         print(a.tipo.value_counts())
 
         print(list(a[(a.tipo == 'bigint') & (a.columna != self.CAMPO_CLAVE)].columna))
+
+
+
+
 
         # Si no se quiere que todas las bigint pasen a ShortType cambiar variables_bigint
 
@@ -243,19 +250,6 @@ class Challenger():
             train_undersampled_df = train_undersampled_df.withColumn(c_name, F.col(c_name).cast(ShortType()))
 
         return train_undersampled_df
-
-    def RedondearDecimales(self, train_undersampled_df, pDecimales):
-        # Redondeo decimales
-        # Numerical vars
-        numericCols = [c for c in train_undersampled_df.columns if c not in [self.CAMPO_CLAVE,'periodo', 'origin', 'label']]
-        print("Num. numeric vars: " , len(numericCols))
-        for c_name in numericCols:
-            #if c_type in ('double', 'float', 'decimal', 'int', 'smallint'):
-            train_undersampled_df = train_undersampled_df.withColumn(c_name, F.round(c_name, pDecimales))
-        
-        return train_undersampled_df
-
-        
 
     def RedondearDecimales(self, train_undersampled_df, pDecimales):
         # Redondeo decimales
@@ -1726,15 +1720,3 @@ class Challenger():
     def json_dump(self):
         import json
         return json.dumps(self.__dict__)
-
-    
-    @classmethod
-    def instanciar_desde_json(cls, json_file):
-        import json
-        with open(json_file) as reader:
-            json_data=json.load(reader)
-        return cls(**json_data)
-    
-    def json_dump(self):
-        import json
-        return json.dumps(self.__dict__)        
